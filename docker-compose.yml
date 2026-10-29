@@ -1,0 +1,23 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: ledgr_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: ledgr
+      MYSQL_USER: ledgr
+      MYSQL_PASSWORD: ledgr_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - ledgr_mysql_data:/var/lib/mysql
+      - ./server/src/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  ledgr_mysql_data:
