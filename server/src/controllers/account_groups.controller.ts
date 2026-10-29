@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import pool from '../db/connection.js';
+import { AppError } from '../middleware/errorHandler.js';
 
 export const getAccountGroups = async (
   _req: Request,
@@ -28,8 +29,10 @@ export const createAccountGroup = async (
       'INSERT INTO account_groups (name, sort_order) VALUES (?, ?)',
       [name, maxOrder + 1],
     )) as unknown as [{ insertId: number }];
-    const [rows] = await pool.query('SELECT * FROM account_groups WHERE id = ?', [result.insertId]);
-    res.status(201).json((rows as unknown[])[0]);
+    const [rows] = (await pool.query('SELECT * FROM account_groups WHERE id = ?', [
+      result.insertId,
+    ])) as unknown as [unknown[]];
+    res.status(201).json(rows[0]);
   } catch (err) {
     next(err);
   }
@@ -42,9 +45,18 @@ export const updateAccountGroup = async (
 ): Promise<void> => {
   try {
     const { name } = req.body as { name: string };
+    const [existing] = (await pool.query('SELECT id FROM account_groups WHERE id = ?', [
+      req.params.id,
+    ])) as unknown as [unknown[]];
+    if (!existing || existing.length === 0) {
+      throw new AppError(404, 'Account group not found');
+    }
+
     await pool.query('UPDATE account_groups SET name = ? WHERE id = ?', [name, req.params.id]);
-    const [rows] = await pool.query('SELECT * FROM account_groups WHERE id = ?', [req.params.id]);
-    res.json((rows as unknown[])[0]);
+    const [rows] = (await pool.query('SELECT * FROM account_groups WHERE id = ?', [
+      req.params.id,
+    ])) as unknown as [unknown[]];
+    res.json(rows[0]);
   } catch (err) {
     next(err);
   }
@@ -56,6 +68,13 @@ export const deleteAccountGroup = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
+    const [existing] = (await pool.query('SELECT id FROM account_groups WHERE id = ?', [
+      req.params.id,
+    ])) as unknown as [unknown[]];
+    if (!existing || existing.length === 0) {
+      throw new AppError(404, 'Account group not found');
+    }
+
     const [[{ count }]] = (await pool.query(
       'SELECT COUNT(*) AS count FROM accounts WHERE group_id = ?',
       [req.params.id],

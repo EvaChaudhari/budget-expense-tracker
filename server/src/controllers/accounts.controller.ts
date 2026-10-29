@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import pool from '../db/connection.js';
+import { AppError } from '../middleware/errorHandler.js';
 
 export const getAccounts = async (
   _req: Request,
@@ -34,8 +35,10 @@ export const createAccount = async (
       'INSERT INTO accounts (name, type, icon, color, balance, group_id) VALUES (?, ?, ?, ?, ?, ?)',
       [name, type, icon ?? 'wallet', color ?? '#2563eb', balance ?? 0, group_id ?? null],
     )) as unknown as [{ insertId: number }];
-    const [rows] = await pool.query('SELECT * FROM accounts WHERE id = ?', [result.insertId]);
-    res.status(201).json((rows as unknown[])[0]);
+    const [rows] = (await pool.query('SELECT * FROM accounts WHERE id = ?', [
+      result.insertId,
+    ])) as unknown as [unknown[]];
+    res.status(201).json(rows[0]);
   } catch (err) {
     next(err);
   }
@@ -47,6 +50,13 @@ export const updateAccount = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
+    const [existing] = (await pool.query('SELECT id FROM accounts WHERE id = ?', [
+      req.params.id,
+    ])) as unknown as [unknown[]];
+    if (!existing || existing.length === 0) {
+      throw new AppError(404, 'Account not found');
+    }
+
     const { name, type, icon, color, balance, group_id } = req.body as {
       name?: string;
       type?: string;
@@ -85,8 +95,10 @@ export const updateAccount = async (
       values.push(req.params.id);
       await pool.query(`UPDATE accounts SET ${fields.join(', ')} WHERE id = ?`, values);
     }
-    const [rows] = await pool.query('SELECT * FROM accounts WHERE id = ?', [req.params.id]);
-    res.json((rows as unknown[])[0]);
+    const [rows] = (await pool.query('SELECT * FROM accounts WHERE id = ?', [
+      req.params.id,
+    ])) as unknown as [unknown[]];
+    res.json(rows[0]);
   } catch (err) {
     next(err);
   }
@@ -98,6 +110,21 @@ export const deleteAccount = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
+    const [existing] = (await pool.query('SELECT id FROM accounts WHERE id = ?', [
+      req.params.id,
+    ])) as unknown as [unknown[]];
+    if (!existing || existing.length === 0) {
+      throw new AppError(404, 'Account not found');
+    }
+
+    const [[{ count }]] = (await pool.query(
+      'SELECT COUNT(*) AS count FROM transactions WHERE account_id = ?',
+      [req.params.id],
+    )) as unknown as [[{ count: number }]];
+    if (count > 0) {
+      throw new AppError(409, 'Cannot delete account because it has associated transactions');
+    }
+
     await pool.query('DELETE FROM accounts WHERE id = ?', [req.params.id]);
     res.status(204).send();
   } catch (err) {

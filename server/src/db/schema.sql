@@ -30,7 +30,12 @@ CREATE TABLE IF NOT EXISTS categories (
   UNIQUE KEY uq_name_type (name, type)
 );
 
-ALTER TABLE categories DROP COLUMN IF EXISTS color;
+-- Drop legacy color column if it exists from earlier versions
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'categories' AND column_name = 'color');
+SET @sql := IF(@col_exists > 0, 'ALTER TABLE categories DROP COLUMN color', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 INSERT IGNORE INTO categories (name, type, icon) VALUES
   ('Salary',       'income',  'briefcase'),
@@ -134,7 +139,12 @@ CREATE TABLE IF NOT EXISTS transactions (
   CONSTRAINT fk_tx_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT
 );
 
-ALTER TABLE transactions ADD COLUMN IF NOT EXISTS description TEXT NULL DEFAULT NULL;
+-- Add description column if missing from earlier versions
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'transactions' AND column_name = 'description');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE transactions ADD COLUMN description TEXT NULL DEFAULT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 INSERT IGNORE INTO transactions (id, account_id, category_id, amount, note, tx_date, tx_time) VALUES
   (1,  3, 1,  5200.00, 'Monthly salary — Acme Sdn Bhd',   '2026-06-16', '09:00:00'),

@@ -15,6 +15,7 @@ A personal finance tracker for monitoring income, expenses, budgets, and account
 - [Available Scripts](#available-scripts)
 - [Environment Variables](#environment-variables)
 - [Database](#database)
+- [Database Systems (DBS) Academic Reference](#database-systems-dbs-academic-reference)
 - [API Overview](#api-overview)
 
 ---
@@ -148,21 +149,23 @@ Run from the project root:
 | `npm run build`     | Build both client and server for production       |
 | `npm run lint`      | Lint both workspaces                              |
 | `npm run typecheck` | Run TypeScript type checks across both workspaces |
+| `npm run test`      | Run automated test suite for backend and database |
 
 ---
 
 ## Environment Variables
 
-The server reads the following variables. Create a `.env` file inside `server/` if overriding the defaults.
+The server reads the following variables from `server/.env` (or environment defaults):
 
-| Variable  | Default          | Description         |
-| --------- | ---------------- | ------------------- |
-| `PORT`    | `3000`           | Express server port |
-| `DB_HOST` | `127.0.0.1`      | MySQL host          |
-| `DB_PORT` | `3306`           | MySQL port          |
-| `DB_NAME` | `ledgr`          | Database name       |
-| `DB_USER` | `ledgr`          | Database user       |
-| `DB_PASS` | `ledgr_password` | Database password   |
+| Variable      | Default                 | Description                                      |
+| ------------- | ----------------------- | ------------------------------------------------ |
+| `PORT`        | `3001`                  | Express server port                              |
+| `CLIENT_URL`  | `http://localhost:5173` | Allowed frontend origin for CORS                 |
+| `DB_HOST`     | `127.0.0.1`             | MySQL host (`localhost` or IP)                   |
+| `DB_PORT`     | `3306`                  | MySQL port                                       |
+| `DB_NAME`     | `ledgr`                 | Database name                                    |
+| `DB_USER`     | `ledgr`                 | Database user                                    |
+| `DB_PASSWORD` | `ledgr_password`        | Database password                                |
 
 ---
 
@@ -176,6 +179,20 @@ To reset the database and re-apply the schema:
 docker compose down -v   # removes the volume (all data)
 docker compose up -d     # re-creates with fresh schema and seed data
 ```
+
+---
+
+## Database Systems (DBS) Academic Reference
+
+This repository has been documented and enhanced for academic Database Systems (DBS) coursework:
+
+| Document / Resource | Description |
+| ------------------- | ----------- |
+| [**DBS Project Report**](docs/DBS_PROJECT_REPORT.md) | Comprehensive academic report covering system architecture, ER modeling, normalization proofs, advanced SQL showcase, and testing. |
+| [**Database Schema & ER Diagram**](docs/DATABASE_SCHEMA.md) | Formal relational schema notation, Mermaid ER diagram, comprehensive table dictionaries, constraints, and cardinalities. |
+| [**Normalization Report**](docs/NORMALIZATION_REPORT.md) | Functional dependency (FD) minimal covers, step-by-step 1NF/2NF/3NF/BCNF proofs, and controlled denormalization analysis. |
+| [**Comprehensive SQL Suite**](server/src/db/dbs_queries.sql) | Standalone SQL script with SELECT, INSERT, UPDATE, DELETE, Joins, Aggregations, CTEs, financial queries, views, indexes, and ACID transactions. |
+| [**Testing & Verification Plan**](docs/TESTING_PLAN.md) | Test cases for referential integrity, unique constraints, quantitative data assertions, and an automated verification script. |
 
 ---
 
@@ -210,3 +227,47 @@ All endpoints are prefixed with `/api`.
 | GET    | `/api/stats/categories`                          | Category breakdown for a period       |
 | GET    | `/api/settings`                                  | Get user settings                     |
 | PATCH  | `/api/settings`                                  | Update user settings                  |
+
+---
+
+## Backend Architecture & Design
+
+The backend is built with Express 5 on Node.js using TypeScript with clean separation of concerns:
+
+* **Routes (`server/src/routes/`)**: Define RESTful HTTP endpoints, validate input schemas via Zod middleware, and route requests to controllers.
+* **Controllers (`server/src/controllers/`)**: Parse HTTP parameters, execute database operations via SQL pool, enforce business logic invariants, and format JSON responses.
+* **Database Connection (`server/src/db/connection.ts`)**: Manages a MySQL connection pool using `mysql2/promise` with automatic reconnection, UTC timezone, and decimal number parsing.
+* **Middleware (`server/src/middleware/`)**:
+  * `validate.ts`: Strict schema validation using Zod for request bodies, path parameters, and query parameters.
+  * `errorHandler.ts`: Centralized error handler returning standardized JSON errors (`AppError`, Zod validation errors, MySQL error translation for codes 1062, 1451, and 1452).
+* **ACID Transactions**: Multi-step persistent changes (e.g., creating/updating/deleting transactions with account balance adjustments, or deleting categories with transaction reassignment) execute within explicit database transactions (`beginTransaction`, `commit`, `rollback`).
+
+---
+
+## Project Modifications & Customizations
+
+This project incorporates specific modifications distinguishing it from the base repository:
+
+1. **Transaction Description & Metadata Field**: Added `description TEXT NULL` to `transactions` table. Used across frontend search, transaction editing, and academic JSON metadata tagging.
+2. **Dynamic Category Colors**: Category colors are derived on-the-fly via client palette hashing rather than stored as a mutable database column, eliminating schema redundancy.
+3. **Dual Routing Architecture**: Server mounts both root routes (e.g. `/transactions`) and API-prefixed routes (e.g. `/api/transactions`), providing dual compatibility for Vite reverse-proxy development and direct REST API clients / automated test harnesses.
+4. **Comprehensive Academic DBS Suite**: Added relational views (`v_monthly_category_summary`, `v_account_financial_overview`), secondary B-Tree indexing (`idx_tx_date`, `idx_tx_cat_date`, `idx_tx_account_date`), and analytical SQL query suite (`server/src/db/dbs_queries.sql`).
+
+---
+
+## Automated Testing
+
+The backend includes automated test coverage spanning database integrity, API contract verification, and ledger reconciliation:
+
+```bash
+# Run complete test suite (from workspace root)
+npm run test
+
+# Run tests directly in server workspace
+npm run test --workspace=server
+```
+
+### Test Coverage Highlights:
+* **Database Integrity (`server/tests/db.test.ts`)**: Tests baseline row counts, `ON DELETE RESTRICT` foreign key enforcement, unique constraints (`uq_name_type`, `uq_cat_start`), and atomic rollback semantics.
+* **API Endpoints (`server/tests/api.test.ts`)**: Tests CRUD lifecycle, conflict detection (409), validation rejection (400), and missing resource handling (404) across all resources.
+* **Integration (`server/tests/integration.test.ts`)**: Tests end-to-end transaction insertion, atomic account balance synchronization, transaction amount/account modifications, and clean balance reversal on deletion.

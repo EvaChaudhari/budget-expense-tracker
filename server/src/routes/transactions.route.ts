@@ -15,7 +15,7 @@ const txSchema = z.object({
   category_id: z.number().int().positive(),
   amount: z.number(),
   note: z.string().min(1).max(255),
-  description: z.string().max(2000).optional(),
+  description: z.string().max(2000).nullable().optional(),
   tx_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   tx_time: z
     .string()
