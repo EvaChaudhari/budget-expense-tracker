@@ -1,0 +1,51 @@
+import {
+  Banknote,
+  Briefcase,
+  Car,
+  Clapperboard,
+  Coffee,
+  CreditCard,
+  Fuel,
+  Gift,
+  HeartPulse,
+  Landmark,
+  Laptop,
+  PiggyBank,
+  Receipt,
+  RotateCcw,
+  ShoppingBag,
+  ShoppingCart,
+  Smartphone,
+  Tag,
+  TrendingUp,
+  Utensils,
+  Wallet,
+} from 'lucide-react';
+
+type LucideIcon = typeof Tag;
+
+const ICON_MAP: Record<string, LucideIcon> = {
+  banknote: Banknote,
+  briefcase: Briefcase,
+  car: Car,
+  clapperboard: Clapperboard,
+  coffee: Coffee,
+  'credit-card': CreditCard,
+  fuel: Fuel,
+  gift: Gift,
+  'heart-pulse': HeartPulse,
+  landmark: Landmark,
+  laptop: Laptop,
+  'piggy-bank': PiggyBank,
+  receipt: Receipt,
+  'rotate-ccw': RotateCcw,
+  'shopping-bag': ShoppingBag,
+  'shopping-cart': ShoppingCart,
+  smartphone: Smartphone,
+  tag: Tag,
+  'trending-up': TrendingUp,
+  utensils: Utensils,
+  wallet: Wallet,
+};
+
+export const getLucideIcon = (name: string): LucideIcon => ICON_MAP[name] ?? Tag;
