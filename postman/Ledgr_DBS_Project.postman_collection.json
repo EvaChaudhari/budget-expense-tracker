@@ -1,0 +1,637 @@
+{
+  "info": {
+    "_postman_id": "ledgr-dbs-api-collection-v1",
+    "name": "Ledgr DBS Project — Backend REST API",
+    "description": "Complete Postman collection for Database Systems (DBS) college project demonstration and evaluation.\nCovers CRUD, ACID balance synchronization, domain invariants, foreign keys, aggregations, and recurring payments.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3001/api",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01. System & Settings",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Verifies server is active and responding."
+          }
+        },
+        {
+          "name": "Get User Settings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings",
+              "host": ["{{baseUrl}}"],
+              "path": ["settings"]
+            },
+            "description": "Retrieves currency configuration, symbols, and week start settings."
+          }
+        },
+        {
+          "name": "Update User Settings",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currency_code\": \"INR\",\n  \"currency_symbol\": \"₹\",\n  \"currency_country\": \"India\",\n  \"unit_position\": \"prefix\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/settings",
+              "host": ["{{baseUrl}}"],
+              "path": ["settings"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02. Categories",
+      "item": [
+        {
+          "name": "List All Categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories"]
+            }
+          }
+        },
+        {
+          "name": "Create Category",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Books & Courses\",\n  \"type\": \"expense\",\n  \"icon\": \"book-open\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories"]
+            }
+          }
+        },
+        {
+          "name": "Update Category",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Education & Books\",\n  \"icon\": \"graduation-cap\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/categories/12",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories", "12"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03. Accounts & Groups",
+      "item": [
+        {
+          "name": "List All Accounts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/accounts?userId=user-1",
+              "host": ["{{baseUrl}}"],
+              "path": ["accounts"],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "user-1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"SBI Emergency Savings\",\n  \"type\": \"Savings account\",\n  \"icon\": \"landmark\",\n  \"color\": \"#06b6d4\",\n  \"balance\": 25000.00,\n  \"group_id\": 2,\n  \"userId\": \"user-1\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/accounts",
+              "host": ["{{baseUrl}}"],
+              "path": ["accounts"]
+            }
+          }
+        },
+        {
+          "name": "List Account Groups",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/account-groups",
+              "host": ["{{baseUrl}}"],
+              "path": ["account-groups"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "04. Transactions & Double-Entry Ledger",
+      "item": [
+        {
+          "name": "List Transactions (Filtered by Year & Month)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/transactions?year=2026&month=6&userId=user-1",
+              "host": ["{{baseUrl}}"],
+              "path": ["transactions"],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2026"
+                },
+                {
+                  "key": "month",
+                  "value": "6"
+                },
+                {
+                  "key": "userId",
+                  "value": "user-1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Transaction (ACID Balance Sync)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": 1,\n  \"category_id\": 6,\n  \"amount\": -85.50,\n  \"note\": \"Team dinner at college cafe\",\n  \"description\": \"Celebration after DBS project submission\",\n  \"tx_date\": \"2026-11-15\",\n  \"tx_time\": \"19:30:00\",\n  \"payment_method_id\": 1,\n  \"userId\": \"user-1\",\n  \"paidForMemberId\": \"member-alex\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/transactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["transactions"]
+            },
+            "description": "Atomically inserts transaction AND decrements account balance inside an ACID MySQL transaction."
+          }
+        },
+        {
+          "name": "Update Transaction Amount (Rebalance)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": -95.00,\n  \"note\": \"Team dinner at college cafe (updated bill)\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/transactions/7",
+              "host": ["{{baseUrl}}"],
+              "path": ["transactions", "7"]
+            }
+          }
+        },
+        {
+          "name": "Delete Transaction (Restores Account Balance)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/transactions/7",
+              "host": ["{{baseUrl}}"],
+              "path": ["transactions", "7"]
+            },
+            "description": "Deletes transaction and automatically reverses the amount on the account balance atomically."
+          }
+        }
+      ]
+    },
+    {
+      "name": "05. Budgets & Overrides",
+      "item": [
+        {
+          "name": "Get Budgets for Period",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/budgets?year=2026&month=6",
+              "host": ["{{baseUrl}}"],
+              "path": ["budgets"],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2026"
+                },
+                {
+                  "key": "month",
+                  "value": "6"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Set Default Budget Limit",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"year\": 2026,\n  \"month\": 6,\n  \"amount\": 3500.00\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/budgets/6/default",
+              "host": ["{{baseUrl}}"],
+              "path": ["budgets", "6", "default"]
+            }
+          }
+        },
+        {
+          "name": "Set Month-Specific Override",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 4500.00\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/budgets/6/override/2026/6",
+              "host": ["{{baseUrl}}"],
+              "path": ["budgets", "6", "override", "2026", "6"]
+            }
+          }
+        },
+        {
+          "name": "Remove Month Override",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/budgets/6/override/2026/6",
+              "host": ["{{baseUrl}}"],
+              "path": ["budgets", "6", "override", "2026", "6"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "06. Statistics & Financial Analytics",
+      "item": [
+        {
+          "name": "Monthly Income vs Expense Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/stats/monthly",
+              "host": ["{{baseUrl}}"],
+              "path": ["stats", "monthly"]
+            },
+            "description": "SQL GROUP BY aggregation computing monthly totals across history."
+          }
+        },
+        {
+          "name": "Category Spending Breakdown",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/stats/categories?year=2026&month=6",
+              "host": ["{{baseUrl}}"],
+              "path": ["stats", "categories"],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2026"
+                },
+                {
+                  "key": "month",
+                  "value": "6"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "07. Payment Methods",
+      "item": [
+        {
+          "name": "List Payment Methods",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/payment-methods",
+              "host": ["{{baseUrl}}"],
+              "path": ["payment-methods"]
+            }
+          }
+        },
+        {
+          "name": "Create Payment Method",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Unified Payments Interface (UPI)\",\n  \"icon\": \"smartphone\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payment-methods",
+              "host": ["{{baseUrl}}"],
+              "path": ["payment-methods"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "08. Recurring Rules & Automated Execution",
+      "item": [
+        {
+          "name": "List Recurring Transactions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recurring?userId=user-1",
+              "host": ["{{baseUrl}}"],
+              "path": ["recurring"],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "user-1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Recurring Rule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user-1\",\n  \"title\": \"Hostel Wifi Broadband\",\n  \"amount\": 899.00,\n  \"type\": \"expense\",\n  \"category\": \"Bills\",\n  \"accountId\": 1,\n  \"frequency\": \"monthly\",\n  \"nextDueDate\": \"2026-12-01\",\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/recurring",
+              "host": ["{{baseUrl}}"],
+              "path": ["recurring"]
+            }
+          }
+        },
+        {
+          "name": "Process Due Recurring Payments (Atomic Batch)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user-1\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/recurring/process",
+              "host": ["{{baseUrl}}"],
+              "path": ["recurring", "process"]
+            },
+            "description": "Scans recurring_transactions for due items, creates real transactions, updates account balances, and advances nextDueDate atomically."
+          }
+        }
+      ]
+    },
+    {
+      "name": "09. Family Members & Child Budgets",
+      "item": [
+        {
+          "name": "List Family Members",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/family-members?userId=user-1",
+              "host": ["{{baseUrl}}"],
+              "path": ["family-members"],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "user-1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Child Personal Budget Limits",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/child-budgets?userId=user-1&memberId=member-leo",
+              "host": ["{{baseUrl}}"],
+              "path": ["child-budgets"],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "user-1"
+                },
+                {
+                  "key": "memberId",
+                  "value": "member-leo"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Upsert Child Personal Budget Limit",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1800.00,\n  \"userId\": \"user-1\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/child-budgets/member-leo/6",
+              "host": ["{{baseUrl}}"],
+              "path": ["child-budgets", "member-leo", "6"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Domain Invariants & DBS Error Handling",
+      "item": [
+        {
+          "name": "Reject Budget on Income Category (400)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"year\": 2026,\n  \"month\": 6,\n  \"amount\": 1000.00\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/budgets/1/default",
+              "host": ["{{baseUrl}}"],
+              "path": ["budgets", "1", "default"]
+            },
+            "description": "Category 1 is 'Salary' (income). The backend rejects budgets on income categories with 400 Bad Request."
+          }
+        },
+        {
+          "name": "Reject Cross-Flow Category Reassignment (400)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reassignTo\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/categories/6",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories", "6"]
+            },
+            "description": "Rejects reassigning expense transactions to an income category (Category 1)."
+          }
+        },
+        {
+          "name": "Reject Account Deletion with Transactions (409)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["accounts", "1"]
+            },
+            "description": "Enforces ON DELETE RESTRICT foreign key integrity: account with transactions cannot be deleted."
+          }
+        },
+        {
+          "name": "Reject Invalid ID Path Parameter (400 Zod)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/transactions/invalid-string-id",
+              "host": ["{{baseUrl}}"],
+              "path": ["transactions", "invalid-string-id"]
+            },
+            "description": "Zod schema validation rejects non-integer path parameter with structured JSON error."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -17,6 +17,8 @@ A personal finance tracker for monitoring income, expenses, budgets, and account
 - [Database](#database)
 - [Database Systems (DBS) Academic Reference](#database-systems-dbs-academic-reference)
 - [API Overview](#api-overview)
+- [Postman API Testing & Presentation Guide](#postman-api-testing--presentation-guide)
+- [Automated Testing](#automated-testing)
 
 ---
 
@@ -286,3 +288,19 @@ npm run test --workspace=server
 * **Database Integrity (`server/tests/db.test.ts`)**: Tests baseline row counts, `ON DELETE RESTRICT` foreign key enforcement, unique constraints (`uq_name_type`, `uq_cat_start`), and atomic rollback semantics.
 * **API Endpoints (`server/tests/api.test.ts`)**: Tests CRUD lifecycle, conflict detection (409), validation rejection (400), and missing resource handling (404) across all resources.
 * **Integration (`server/tests/integration.test.ts`)**: Tests end-to-end transaction insertion, atomic account balance synchronization, transaction amount/account modifications, and clean balance reversal on deletion.
+
+---
+
+## Postman API Testing & Presentation Guide
+
+For college project presentations, lab vivas, and manual API verification, a complete Postman collection and environment are included:
+
+- **Postman Collection (v2.1.0)**: [`postman/Ledgr_DBS_Project.postman_collection.json`](postman/Ledgr_DBS_Project.postman_collection.json)
+- **Local Environment**: [`postman/Ledgr_Local_Environment.postman_environment.json`](postman/Ledgr_Local_Environment.postman_environment.json)
+- **Detailed Viva Demonstration Guide**: [`docs/POSTMAN_PRESENTATION_GUIDE.md`](docs/POSTMAN_PRESENTATION_GUIDE.md)
+
+### Key Demonstration Folders:
+1. **Double-Entry Ledger Synchronization (ACID)**: Demonstrates balance decrement on transaction creation and exact reversal on deletion within MySQL transactions.
+2. **Temporal Budgets & Overrides**: Tests baseline and monthly budget limit lookups.
+3. **Automated Recurring Batch Processing**: Triggers `POST /api/recurring/process` for automated recurring expense deductions.
+4. **Relational Invariants & Error Defenses**: Proves data integrity defenses (400 on income category budgets, 400 on cross-flow reassignment, 409 Conflict on deleting accounts with active transactions).
