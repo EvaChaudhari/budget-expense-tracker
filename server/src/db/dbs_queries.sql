@@ -492,13 +492,25 @@ SELECT * FROM v_account_financial_overview;
 -- The following idempotent DDL statements add indexes to eliminate full table scans.
 
 -- 8.1 Index on transaction date for fast calendar and range filtering
-CREATE INDEX idx_tx_date ON transactions(tx_date);
+SET @idx_exists := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'transactions' AND index_name = 'idx_tx_date');
+SET @sql := IF(@idx_exists = 0, 'CREATE INDEX idx_tx_date ON transactions(tx_date)', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- 8.2 Compound index on category_id and tx_date for accelerated monthly category stats
-CREATE INDEX idx_tx_cat_date ON transactions(category_id, tx_date);
+SET @idx_exists := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'transactions' AND index_name = 'idx_tx_cat_date');
+SET @sql := IF(@idx_exists = 0, 'CREATE INDEX idx_tx_cat_date ON transactions(category_id, tx_date)', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- 8.3 Compound index on account_id and tx_date for account ledger history lookups
-CREATE INDEX idx_tx_account_date ON transactions(account_id, tx_date);
+SET @idx_exists := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'transactions' AND index_name = 'idx_tx_account_date');
+SET @sql := IF(@idx_exists = 0, 'CREATE INDEX idx_tx_account_date ON transactions(account_id, tx_date)', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Verification: Inspect indexes on `transactions`
 SHOW INDEX FROM transactions;
