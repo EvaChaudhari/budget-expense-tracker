@@ -420,7 +420,7 @@ export const getTransactions = async (
     if (memberId) params.paidForMemberId = memberId;
 
     const res = await api.get<ApiTransaction[]>('/transactions', { params });
-    if (res.data && res.data.length > 0) {
+    if (Array.isArray(res.data)) {
       return res.data;
     }
   } catch {
@@ -472,6 +472,22 @@ export const postTransaction = async (body: {
 
   try {
     const res = await api.post<ApiTransaction>('/transactions', { ...body, userId });
+    try {
+      const store = getUserStore(userId);
+      const cat = DEFAULT_CATEGORIES.find((c) => c.id === body.category_id);
+      const acc = store.accounts.find((a) => a.id === body.account_id);
+      const savedTx: ApiTransaction = {
+        ...res.data,
+        category_name: res.data.category_name || cat?.name || 'General',
+        category_icon: res.data.category_icon || cat?.icon || 'tag',
+        account_name: res.data.account_name || acc?.name || 'Account',
+      };
+      store.transactions = [savedTx, ...store.transactions.filter((t) => t.id !== res.data.id)];
+      store.accounts = store.accounts.map((a) =>
+        a.id === body.account_id ? { ...a, balance: a.balance + Number(body.amount) } : a,
+      );
+      saveUserStore(userId, store);
+    } catch (err) { void err; }
     return res.data;
   } catch {
     const store = getUserStore(userId);
@@ -524,6 +540,19 @@ export const patchTransaction = async (
 
   try {
     const res = await api.patch<ApiTransaction>(`/transactions/${id}`, { ...body, userId });
+    try {
+      const store = getUserStore(userId);
+      const cat = DEFAULT_CATEGORIES.find((c) => c.id === body.category_id);
+      const acc = store.accounts.find((a) => a.id === body.account_id);
+      const savedTx: ApiTransaction = {
+        ...res.data,
+        category_name: res.data.category_name || cat?.name || 'General',
+        category_icon: res.data.category_icon || cat?.icon || 'tag',
+        account_name: res.data.account_name || acc?.name || 'Account',
+      };
+      store.transactions = store.transactions.map((t) => (t.id === id ? savedTx : t));
+      saveUserStore(userId, store);
+    } catch (err) { void err; }
     return res.data;
   } catch {
     const store = getUserStore(userId);
@@ -563,6 +592,19 @@ export const patchTransaction = async (
 export const deleteTransaction = async (id: number): Promise<{ success: boolean }> => {
   try {
     await api.delete(`/transactions/${id}`);
+    try {
+      const userId = getActiveUserId() || 'user-1';
+      const store = getUserStore(userId);
+      const oldTx = store.transactions.find((t) => t.id === id);
+      if (oldTx) {
+        store.accounts = store.accounts.map((a) =>
+          a.id === oldTx.account_id ? { ...a, balance: a.balance - oldTx.amount } : a,
+        );
+      }
+      store.transactions = store.transactions.filter((t) => t.id !== id);
+      saveUserStore(userId, store);
+    } catch (err) { void err; }
+
   } catch {
     const userId = getActiveUserId() || 'user-1';
     const store = getUserStore(userId);

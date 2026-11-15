@@ -32,7 +32,7 @@ function Dashboard() {
   const [txView, setTxView] = useState<TxView>('daily');
   const [statsView, setStatsView] = useState<StatsView>('monthly');
   const { settings, update } = useSettings();
-  const { year, month, label: monthLabel, prev, next } = useMonth();
+  const { year, month, label: monthLabel, prev, next, setMonthAndYear } = useMonth();
   const [viewYear, setViewYear] = useState(year);
   const [statsYear, setStatsYear] = useState(year);
   const { activeMember } = useAuth();
@@ -133,7 +133,20 @@ function Dashboard() {
       <BottomNav activeTab={tab} onTabChange={setTab} />
 
       {showAddModal && (
-        <AddTransactionModal onClose={() => setShowAddModal(false)} settings={settings} />
+        <AddTransactionModal
+          onClose={() => setShowAddModal(false)}
+          settings={settings}
+          currentYear={year}
+          currentMonth={month}
+          onSuccess={(savedTx) => {
+            if (savedTx?.tx_date) {
+              const [y, m] = savedTx.tx_date.split('-').map(Number);
+              if (y !== year || m - 1 !== month) {
+                setMonthAndYear(y, m - 1);
+              }
+            }
+          }}
+        />
       )}
     </div>
   );

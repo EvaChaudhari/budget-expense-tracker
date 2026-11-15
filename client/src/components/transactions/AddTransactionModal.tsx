@@ -16,6 +16,9 @@ interface Props {
   settings: UserSettings;
   transaction?: ApiTransaction;
   onDelete?: () => void;
+  currentYear?: number;
+  currentMonth?: number; // 0-indexed
+  onSuccess?: (savedTx: ApiTransaction) => void;
 }
 
 interface FormState {
@@ -45,6 +48,9 @@ export default function AddTransactionModal({
   settings,
   transaction,
   onDelete,
+  currentYear,
+  currentMonth,
+  onSuccess,
 }: Props) {
   const { user, activeMember, isChild, familyMembers } = useAuth();
   const isEdit = transaction !== undefined;
@@ -56,6 +62,22 @@ export default function AddTransactionModal({
   const initialPaidForMemberId = isChild && activeMember
     ? activeMember.id
     : (transaction?.paidForMemberId ?? '');
+
+  const resolveInitialDate = () => {
+    if (transaction?.tx_date) return transaction.tx_date;
+    const now = new Date();
+    if (
+      currentYear !== undefined &&
+      currentMonth !== undefined &&
+      (now.getFullYear() !== currentYear || now.getMonth() !== currentMonth)
+    ) {
+      const y = currentYear;
+      const m = String(currentMonth + 1).padStart(2, '0');
+      const d = String(Math.min(now.getDate(), 28)).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    return localToday();
+  };
 
   const [form, setForm] = useState<FormState>(() =>
     isEdit
@@ -76,7 +98,7 @@ export default function AddTransactionModal({
           categoryId: '',
           accountId: '',
           paymentMethodId: '',
-          date: localToday(),
+          date: resolveInitialDate(),
           note: '',
           description: '',
           paidForMemberId: initialPaidForMemberId,
@@ -111,11 +133,14 @@ export default function AddTransactionModal({
   const { mutate, isPending, isError, error } = useMutation({
     mutationFn: (body: Parameters<typeof postTransaction>[0]) =>
       isEdit ? patchTransaction(transaction!.id, body) : postTransaction(body),
-    onSuccess: () => {
+    onSuccess: (savedTx) => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
       queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      if (onSuccess && savedTx) {
+        onSuccess(savedTx);
+      }
       onClose();
     },
   });

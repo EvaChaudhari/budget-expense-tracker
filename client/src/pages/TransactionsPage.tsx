@@ -204,6 +204,8 @@ export default function TransactionsPage({
         <AddTransactionModal
           transaction={editTx}
           settings={settings}
+          currentYear={year}
+          currentMonth={month}
           onClose={() => setEditTx(null)}
           onDelete={() => {
             deleteTx(editTx.id);
