@@ -67,10 +67,10 @@ export default function Sidebar({
         <div className="flex items-center gap-2.75 px-2 pb-6.5 pt-1.5">
           <img
             src="/budget-tracker-logo.png"
-            alt="Ledgr logo"
+            alt="Monexa logo"
             className="w-9.5 h-9.5 object-contain"
           />
-          <span className="text-[22px] font-extrabold tracking-[-0.03em]">Ledgr</span>
+          <span className="text-[22px] font-extrabold tracking-[-0.03em]">Monexa</span>
         </div>
 
         {/* Nav */}
