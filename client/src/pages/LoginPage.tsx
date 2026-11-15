@@ -123,7 +123,7 @@ export default function LoginPage({ initialTab = 'login' }: Props) {
             <div className="w-14 h-14 rounded-[18px] bg-accent-soft border border-border flex items-center justify-center mb-4">
               <img
                 src="/budget-tracker-logo.png"
-                alt="Ledgr Logo"
+                alt="Monexa Logo"
                 className="w-9 h-9 object-contain"
               />
             </div>
@@ -443,7 +443,7 @@ export default function LoginPage({ initialTab = 'login' }: Props) {
 
         {/* Footnote */}
         <div className="text-center mt-6 text-xs text-text-subtle">
-          Ledgr Client Finance &bull; Private & Secure Workspace &bull; INR (₹)
+          Monexa Client Finance &bull; Private & Secure Workspace &bull; INR (₹)
         </div>
       </div>
     </div>
