@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, X, Repeat, Calendar, AlertCircle } from 'lucide-react';
 import type { RecurringTransaction, UserSettings } from '../../types/index.ts';
@@ -57,39 +57,31 @@ export default function AddRecurringModal({
     queryFn: fetchAccounts,
   });
 
-  const [form, setForm] = useState<FormState>(() =>
-    initialData
-      ? {
-          title: initialData.title,
-          amount: String(initialData.amount),
-          type: initialData.type,
-          categoryId: '',
-          accountId: initialData.accountId,
-          frequency: initialData.frequency,
-          firstPaymentDate: initialData.nextDueDate,
-        }
-      : {
-          title: '',
-          amount: '',
-          type: 'expense',
-          categoryId: '',
-          accountId: '',
-          frequency: 'monthly',
-          firstPaymentDate: localToday(),
-        },
-  );
-
-  // If editing and categories load, select existing category
-  useEffect(() => {
-    if (initialData && allCategories.length > 0 && form.categoryId === '') {
+  const [form, setForm] = useState<FormState>(() => {
+    if (initialData) {
       const match = allCategories.find(
         (c) => c.name.toLowerCase() === initialData.category.toLowerCase(),
       );
-      if (match) {
-        setForm((prev) => ({ ...prev, categoryId: match.id }));
-      }
+      return {
+        title: initialData.title,
+        amount: String(initialData.amount),
+        type: initialData.type,
+        categoryId: match ? match.id : '',
+        accountId: initialData.accountId,
+        frequency: initialData.frequency,
+        firstPaymentDate: initialData.nextDueDate,
+      };
     }
-  }, [initialData, allCategories, form.categoryId]);
+    return {
+      title: '',
+      amount: '',
+      type: 'expense',
+      categoryId: '',
+      accountId: '',
+      frequency: 'monthly',
+      firstPaymentDate: localToday(),
+    };
+  });
 
   const switchType = (t: 'income' | 'expense') =>
     setForm((prev) => ({ ...prev, type: t, categoryId: '' }));

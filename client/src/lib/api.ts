@@ -36,7 +36,7 @@ export function getActiveUserId(): string {
 }
 
 /* =========================================================================
- * Child Budget Limits (per-member, stored in localStorage)
+ * Child Budget Limits
  * ========================================================================= */
 
 const getChildBudgetKey = (userId: string) => `ledgr_child_budgets_${userId}`;
@@ -55,47 +55,64 @@ function saveChildBudgetStore(userId: string, store: ChildBudgetStore) {
   localStorage.setItem(getChildBudgetKey(userId), JSON.stringify(store));
 }
 
-/** Fetch all personal category budget limits for a child member */
 export const fetchChildBudgetLimits = async (
   userId: string,
   memberId: string,
 ): Promise<ChildBudgetLimit[]> => {
+  try {
+    const res = await api.get<ChildBudgetLimit[]>('/child-budgets', {
+      params: { userId, memberId },
+    });
+    if (res.data && res.data.length > 0) return res.data;
+  } catch {
+    // fallback
+  }
   const store = getChildBudgetStore(userId);
   return store.limits.filter((l) => l.memberId === memberId);
 };
 
-/** Set (upsert) a personal category budget limit for a child member */
 export const setChildBudgetLimit = async (
   userId: string,
   memberId: string,
   categoryId: number,
   amount: number,
 ): Promise<ChildBudgetLimit> => {
-  const store = getChildBudgetStore(userId);
-  const idx = store.limits.findIndex(
-    (l) => l.memberId === memberId && l.categoryId === categoryId,
-  );
-  const updated: ChildBudgetLimit = { memberId, categoryId, amount };
-  if (idx >= 0) {
-    store.limits[idx] = updated;
-  } else {
-    store.limits.push(updated);
+  try {
+    const res = await api.put<ChildBudgetLimit>(`/child-budgets/${memberId}/${categoryId}`, {
+      amount,
+      userId,
+    });
+    return res.data;
+  } catch {
+    const store = getChildBudgetStore(userId);
+    const idx = store.limits.findIndex(
+      (l) => l.memberId === memberId && l.categoryId === categoryId,
+    );
+    const updated: ChildBudgetLimit = { memberId, categoryId, amount };
+    if (idx >= 0) {
+      store.limits[idx] = updated;
+    } else {
+      store.limits.push(updated);
+    }
+    saveChildBudgetStore(userId, store);
+    return updated;
   }
-  saveChildBudgetStore(userId, store);
-  return updated;
 };
 
-/** Remove a personal category budget limit for a child member */
 export const removeChildBudgetLimit = async (
   userId: string,
   memberId: string,
   categoryId: number,
 ): Promise<void> => {
-  const store = getChildBudgetStore(userId);
-  store.limits = store.limits.filter(
-    (l) => !(l.memberId === memberId && l.categoryId === categoryId),
-  );
-  saveChildBudgetStore(userId, store);
+  try {
+    await api.delete(`/child-budgets/${memberId}/${categoryId}`);
+  } catch {
+    const store = getChildBudgetStore(userId);
+    store.limits = store.limits.filter(
+      (l) => !(l.memberId === memberId && l.categoryId === categoryId),
+    );
+    saveChildBudgetStore(userId, store);
+  }
 };
 
 // Helper to retrieve the current active family member from AuthContext storage
@@ -129,86 +146,172 @@ const api = axios.create({
 export default api;
 
 export const fetchSettings = async (): Promise<UserSettings> => {
+  try {
+    const res = await api.get<UserSettings>('/settings');
+    if (res.data) return res.data;
+  } catch {
+    // fallback
+  }
   const userId = getActiveUserId() || 'user-1';
   const store = getUserStore(userId);
   return store.settings;
 };
 
 export const patchSettings = async (settings: Partial<UserSettings>): Promise<UserSettings> => {
-  const userId = getActiveUserId() || 'user-1';
-  const store = getUserStore(userId);
-  store.settings = { ...store.settings, ...settings };
-  saveUserStore(userId, store);
-  return store.settings;
+  try {
+    const res = await api.patch<UserSettings>('/settings', settings);
+    return res.data;
+  } catch {
+    const userId = getActiveUserId() || 'user-1';
+    const store = getUserStore(userId);
+    store.settings = { ...store.settings, ...settings };
+    saveUserStore(userId, store);
+    return store.settings;
+  }
 };
 
 export const fetchCategories = async (): Promise<Category[]> => {
+  try {
+    const res = await api.get<Category[]>('/categories');
+    if (res.data && res.data.length > 0) return res.data;
+  } catch {
+    // fallback
+  }
   return DEFAULT_CATEGORIES;
 };
 
-export const postCategory = async (body: { name: string; type: 'income' | 'expense'; icon: string }): Promise<Category> => {
-  const newCat: Category = {
-    id: Date.now(),
-    name: body.name,
-    type: body.type,
-    icon: body.icon,
-  };
-  return newCat;
+export const postCategory = async (body: {
+  name: string;
+  type: 'income' | 'expense';
+  icon: string;
+}): Promise<Category> => {
+  try {
+    const res = await api.post<Category>('/categories', body);
+    return res.data;
+  } catch {
+    return { id: Date.now(), ...body };
+  }
 };
 
-export const patchCategory = async (id: number, body: { name: string; icon: string }): Promise<Category> => {
-  const found = DEFAULT_CATEGORIES.find((c) => c.id === id);
-  return {
-    id,
-    name: body.name,
-    icon: body.icon,
-    type: found?.type || 'expense',
-  };
+export const patchCategory = async (
+  id: number,
+  body: { name: string; icon: string },
+): Promise<Category> => {
+  try {
+    const res = await api.patch<Category>(`/categories/${id}`, body);
+    return res.data;
+  } catch {
+    const found = DEFAULT_CATEGORIES.find((c) => c.id === id);
+    return {
+      id,
+      name: body.name,
+      icon: body.icon,
+      type: found?.type || 'expense',
+    };
+  }
 };
 
-export const deleteCategory = async (_id: number, _reassignTo?: number) => {
+export const deleteCategory = async (id: number, reassignTo?: number) => {
+  try {
+    await api.delete(
+      `/categories/${id}`,
+      reassignTo !== undefined ? { data: { reassignTo } } : undefined,
+    );
+  } catch {
+    // fallback
+  }
   return { success: true };
 };
 
 export const fetchPaymentMethods = async (): Promise<PaymentMethod[]> => {
+  try {
+    const res = await api.get<PaymentMethod[]>('/payment-methods');
+    if (res.data && res.data.length > 0) return res.data;
+  } catch {
+    // fallback
+  }
   return defaultPaymentMethods;
 };
 
-export const postPaymentMethod = async (body: { name: string; icon: string }): Promise<PaymentMethod> => {
-  return { id: Date.now(), ...body };
+export const postPaymentMethod = async (body: {
+  name: string;
+  icon: string;
+}): Promise<PaymentMethod> => {
+  try {
+    const res = await api.post<PaymentMethod>('/payment-methods', body);
+    return res.data;
+  } catch {
+    return { id: Date.now(), ...body };
+  }
 };
 
-export const patchPaymentMethod = async (id: number, body: { name: string; icon: string }): Promise<PaymentMethod> => {
-  return { id, ...body };
+export const patchPaymentMethod = async (
+  id: number,
+  body: { name: string; icon: string },
+): Promise<PaymentMethod> => {
+  try {
+    const res = await api.patch<PaymentMethod>(`/payment-methods/${id}`, body);
+    return res.data;
+  } catch {
+    return { id, ...body };
+  }
 };
 
-export const deletePaymentMethod = async (_id: number) => {
+export const deletePaymentMethod = async (id: number) => {
+  try {
+    await api.delete(`/payment-methods/${id}`);
+  } catch {
+    // fallback
+  }
   return { success: true };
 };
 
-/**
- * Fetch accounts strictly filtered by the active user's userId
- */
 export const fetchAccounts = async (): Promise<Account[]> => {
-  const userId = getActiveUserId();
-  if (!userId) return [];
+  const userId = getActiveUserId() || 'user-1';
+  try {
+    const res = await api.get<Account[]>('/accounts', { params: { userId } });
+    if (res.data && res.data.length > 0) return res.data;
+  } catch {
+    // fallback
+  }
   const store = getUserStore(userId);
-  return store.accounts.filter((a) => a.userId === userId);
+  return store.accounts.filter((a) => !a.userId || a.userId === userId);
 };
 
 export const fetchAccountGroups = async (): Promise<AccountGroup[]> => {
+  try {
+    const res = await api.get<AccountGroup[]>('/account-groups');
+    if (res.data && res.data.length > 0) return res.data;
+  } catch {
+    // fallback
+  }
   return DEFAULT_ACCOUNT_GROUPS;
 };
 
 export const postAccountGroup = async (name: string): Promise<AccountGroup> => {
-  return { id: Date.now(), name, sort_order: 99 };
+  try {
+    const res = await api.post<AccountGroup>('/account-groups', { name });
+    return res.data;
+  } catch {
+    return { id: Date.now(), name, sort_order: 99 };
+  }
 };
 
 export const patchAccountGroup = async (id: number, name: string): Promise<AccountGroup> => {
-  return { id, name, sort_order: 1 };
+  try {
+    const res = await api.patch<AccountGroup>(`/account-groups/${id}`, { name });
+    return res.data;
+  } catch {
+    return { id, name, sort_order: 1 };
+  }
 };
 
-export const deleteAccountGroup = async (_id: number) => {
+export const deleteAccountGroup = async (id: number) => {
+  try {
+    await api.delete(`/account-groups/${id}`);
+  } catch {
+    // fallback
+  }
   return { success: true };
 };
 
@@ -217,17 +320,33 @@ export const patchAccount = async (
   body: Partial<Pick<Account, 'name' | 'type' | 'icon' | 'color' | 'balance' | 'group_id'>>,
 ): Promise<Account> => {
   const userId = getActiveUserId() || 'user-1';
-  const store = getUserStore(userId);
-  let updatedAccount: Account | undefined;
-  store.accounts = store.accounts.map((acc) => {
-    if (acc.id === id) {
-      updatedAccount = { ...acc, ...body, userId };
-      return updatedAccount;
-    }
-    return acc;
-  });
-  saveUserStore(userId, store);
-  return updatedAccount || { id, name: '', type: '', icon: 'wallet', color: '#2563eb', balance: 0, group_id: 1, userId };
+  try {
+    const res = await api.patch<Account>(`/accounts/${id}`, body);
+    return res.data;
+  } catch {
+    const store = getUserStore(userId);
+    let updatedAccount: Account | undefined;
+    store.accounts = store.accounts.map((acc) => {
+      if (acc.id === id) {
+        updatedAccount = { ...acc, ...body, userId };
+        return updatedAccount;
+      }
+      return acc;
+    });
+    saveUserStore(userId, store);
+    return (
+      updatedAccount || {
+        id,
+        name: '',
+        type: '',
+        icon: 'wallet',
+        color: '#2563eb',
+        balance: 0,
+        group_id: 1,
+        userId,
+      }
+    );
+  }
 };
 
 export const postAccount = async (body: {
@@ -241,27 +360,27 @@ export const postAccount = async (body: {
 }): Promise<Account> => {
   const activeUserId = getActiveUserId();
   const userId = body.userId || activeUserId || 'user-1';
-  const store = getUserStore(userId);
-  const newAcc: Account = {
-    id: Date.now(),
-    name: body.name,
-    type: body.type,
-    icon: body.icon || 'wallet',
-    color: body.color || '#2563eb',
-    balance: body.balance ?? 0,
-    group_id: body.group_id ?? 1,
-    userId,
-  };
-  store.accounts.push(newAcc);
-  saveUserStore(userId, store);
-  return newAcc;
+  try {
+    const res = await api.post<Account>('/accounts', { ...body, userId });
+    return res.data;
+  } catch {
+    const store = getUserStore(userId);
+    const newAcc: Account = {
+      id: Date.now(),
+      name: body.name,
+      type: body.type,
+      icon: body.icon || 'wallet',
+      color: body.color || '#2563eb',
+      balance: body.balance ?? 0,
+      group_id: body.group_id ?? 1,
+      userId,
+    };
+    store.accounts.push(newAcc);
+    saveUserStore(userId, store);
+    return newAcc;
+  }
 };
 
-/**
- * Fetch transactions scoped by active userId and active family member role:
- * - If isChild is true, return ONLY transactions where paidForMemberId === activeMember.id
- * - If isChild is false (Parent view), return all household transactions
- */
 export const getTransactions = async (
   userIdOrYear?: string | number,
   activeMemberOrMonth?: FamilyMember | null | number,
@@ -274,14 +393,14 @@ export const getTransactions = async (
   let month: number | undefined = undefined;
 
   if (typeof userIdOrYear === 'number') {
-    // Called like getTransactions(year, month)
     year = userIdOrYear;
     month = typeof activeMemberOrMonth === 'number' ? activeMemberOrMonth : undefined;
     userId = getActiveUserId() || 'user-1';
     activeMember = getActiveMemberFromStorage();
   } else {
-    // Called like getTransactions(userId, activeMember, year?, month?)
-    userId = (typeof userIdOrYear === 'string' && userIdOrYear ? userIdOrYear : getActiveUserId()) || 'user-1';
+    userId =
+      (typeof userIdOrYear === 'string' && userIdOrYear ? userIdOrYear : getActiveUserId()) ||
+      'user-1';
     activeMember =
       activeMemberOrMonth && typeof activeMemberOrMonth === 'object'
         ? activeMemberOrMonth
@@ -290,18 +409,32 @@ export const getTransactions = async (
     month = optMonth;
   }
 
+  const isChild = activeMember?.role === 'Child';
+  const memberId = isChild && activeMember?.id ? activeMember.id : undefined;
+
+  try {
+    const params: Record<string, string | number> = {};
+    if (year !== undefined) params.year = year;
+    if (month !== undefined) params.month = month + 1;
+    if (userId) params.userId = userId;
+    if (memberId) params.paidForMemberId = memberId;
+
+    const res = await api.get<ApiTransaction[]>('/transactions', { params });
+    if (res.data && res.data.length > 0) {
+      return res.data;
+    }
+  } catch {
+    // fallback to local storage
+  }
+
   if (!userId) return [];
   const store = getUserStore(userId);
-  const isChild = activeMember?.role === 'Child';
-
   return store.transactions
     .filter((tx) => !tx.userId || tx.userId === userId)
     .filter((tx) => {
-      // If isChild is true, return ONLY transactions where paidForMemberId === activeMember.id
       if (isChild && activeMember?.id) {
         return tx.paidForMemberId === activeMember.id;
       }
-      // If isChild is false (Parent view), return all household transactions
       return true;
     })
     .filter((tx) => {
@@ -312,9 +445,6 @@ export const getTransactions = async (
     .sort((a, b) => b.tx_date.localeCompare(a.tx_date) || b.tx_time.localeCompare(a.tx_time));
 };
 
-/**
- * Fetch transactions strictly filtered by the active user and member view
- */
 export const fetchTransactions = async (
   year?: number,
   month?: number,
@@ -325,9 +455,6 @@ export const fetchTransactions = async (
   return getTransactions(userId, member, year, month);
 };
 
-/**
- * Create a new transaction with the active user's userId and paidForMemberId attached
- */
 export const postTransaction = async (body: {
   account_id: number;
   category_id: number;
@@ -342,39 +469,41 @@ export const postTransaction = async (body: {
 }): Promise<ApiTransaction> => {
   const activeUserId = getActiveUserId();
   const userId = body.userId || activeUserId || 'user-1';
-  const store = getUserStore(userId);
-  const cat = DEFAULT_CATEGORIES.find((c) => c.id === body.category_id);
-  const acc = store.accounts.find((a) => a.id === body.account_id);
 
-  const newTx: ApiTransaction = {
-    id: Date.now(),
-    account_id: body.account_id,
-    category_id: body.category_id,
-    amount: Number(body.amount),
-    note: body.note || '',
-    description: body.description || null,
-    tx_date: body.tx_date,
-    tx_time: body.tx_time || '12:00:00',
-    category_name: cat?.name || 'General',
-    category_icon: cat?.icon || 'tag',
-    account_name: acc?.name || 'Account',
-    payment_method_id: body.payment_method_id,
-    userId, // explicitly attached to the logged-in user
-    paidForMemberId: body.paidForMemberId || null,
-  };
+  try {
+    const res = await api.post<ApiTransaction>('/transactions', { ...body, userId });
+    return res.data;
+  } catch {
+    const store = getUserStore(userId);
+    const cat = DEFAULT_CATEGORIES.find((c) => c.id === body.category_id);
+    const acc = store.accounts.find((a) => a.id === body.account_id);
 
-  // Update account balance
-  store.accounts = store.accounts.map((a) =>
-    a.id === body.account_id ? { ...a, balance: a.balance + Number(body.amount) } : a
-  );
-  store.transactions = [newTx, ...store.transactions];
-  saveUserStore(userId, store);
-  return newTx;
+    const newTx: ApiTransaction = {
+      id: Date.now(),
+      account_id: body.account_id,
+      category_id: body.category_id,
+      amount: Number(body.amount),
+      note: body.note || '',
+      description: body.description || null,
+      tx_date: body.tx_date,
+      tx_time: body.tx_time || '12:00:00',
+      category_name: cat?.name || 'General',
+      category_icon: cat?.icon || 'tag',
+      account_name: acc?.name || 'Account',
+      payment_method_id: body.payment_method_id,
+      userId,
+      paidForMemberId: body.paidForMemberId || null,
+    };
+
+    store.accounts = store.accounts.map((a) =>
+      a.id === body.account_id ? { ...a, balance: a.balance + Number(body.amount) } : a,
+    );
+    store.transactions = [newTx, ...store.transactions];
+    saveUserStore(userId, store);
+    return newTx;
+  }
 };
 
-/**
- * Update a transaction, keeping it scoped to the active user's userId
- */
 export const patchTransaction = async (
   id: number,
   body: {
@@ -392,59 +521,71 @@ export const patchTransaction = async (
 ): Promise<ApiTransaction> => {
   const activeUserId = getActiveUserId();
   const userId = body.userId || activeUserId || 'user-1';
-  const store = getUserStore(userId);
-  const oldTx = store.transactions.find((t) => t.id === id);
-  const cat = DEFAULT_CATEGORIES.find((c) => c.id === body.category_id);
-  const acc = store.accounts.find((a) => a.id === body.account_id);
 
-  const updated: ApiTransaction = {
-    ...(oldTx || ({} as ApiTransaction)),
-    ...body,
-    id,
-    category_name: cat?.name || oldTx?.category_name || 'General',
-    category_icon: cat?.icon || oldTx?.category_icon || 'tag',
-    account_name: acc?.name || oldTx?.account_name || 'Account',
-    userId,
-    paidForMemberId:
-      body.paidForMemberId !== undefined
-        ? body.paidForMemberId
-        : oldTx?.paidForMemberId || null,
-  };
+  try {
+    const res = await api.patch<ApiTransaction>(`/transactions/${id}`, { ...body, userId });
+    return res.data;
+  } catch {
+    const store = getUserStore(userId);
+    const oldTx = store.transactions.find((t) => t.id === id);
+    const cat = DEFAULT_CATEGORIES.find((c) => c.id === body.category_id);
+    const acc = store.accounts.find((a) => a.id === body.account_id);
 
-  if (oldTx) {
-    // Revert old tx on old account
-    store.accounts = store.accounts.map((a) =>
-      a.id === oldTx.account_id ? { ...a, balance: a.balance - oldTx.amount } : a
-    );
-    // Apply new tx on new account
-    store.accounts = store.accounts.map((a) =>
-      a.id === body.account_id ? { ...a, balance: a.balance + body.amount } : a
-    );
+    const updated: ApiTransaction = {
+      ...(oldTx || ({} as ApiTransaction)),
+      ...body,
+      id,
+      category_name: cat?.name || oldTx?.category_name || 'General',
+      category_icon: cat?.icon || oldTx?.category_icon || 'tag',
+      account_name: acc?.name || oldTx?.account_name || 'Account',
+      userId,
+      paidForMemberId:
+        body.paidForMemberId !== undefined
+          ? body.paidForMemberId
+          : oldTx?.paidForMemberId || null,
+    };
+
+    if (oldTx) {
+      store.accounts = store.accounts.map((a) =>
+        a.id === oldTx.account_id ? { ...a, balance: a.balance - oldTx.amount } : a,
+      );
+      store.accounts = store.accounts.map((a) =>
+        a.id === body.account_id ? { ...a, balance: a.balance + body.amount } : a,
+      );
+    }
+
+    store.transactions = store.transactions.map((t) => (t.id === id ? updated : t));
+    saveUserStore(userId, store);
+    return updated;
   }
-
-  store.transactions = store.transactions.map((t) => (t.id === id ? updated : t));
-  saveUserStore(userId, store);
-  return updated;
 };
 
 export const deleteTransaction = async (id: number): Promise<{ success: boolean }> => {
-  const userId = getActiveUserId() || 'user-1';
-  const store = getUserStore(userId);
-  const oldTx = store.transactions.find((t) => t.id === id);
-  if (oldTx) {
-    store.accounts = store.accounts.map((a) =>
-      a.id === oldTx.account_id ? { ...a, balance: a.balance - oldTx.amount } : a
-    );
-    store.transactions = store.transactions.filter((t) => t.id !== id);
-    saveUserStore(userId, store);
+  try {
+    await api.delete(`/transactions/${id}`);
+  } catch {
+    const userId = getActiveUserId() || 'user-1';
+    const store = getUserStore(userId);
+    const oldTx = store.transactions.find((t) => t.id === id);
+    if (oldTx) {
+      store.accounts = store.accounts.map((a) =>
+        a.id === oldTx.account_id ? { ...a, balance: a.balance - oldTx.amount } : a,
+      );
+      store.transactions = store.transactions.filter((t) => t.id !== id);
+      saveUserStore(userId, store);
+    }
   }
   return { success: true };
 };
 
-/**
- * Fetch monthly statistics strictly filtered by the active user's userId
- */
 export const fetchMonthlyStats = async (): Promise<MonthlySummary[]> => {
+  try {
+    const res = await api.get<MonthlySummary[]>('/stats/monthly');
+    if (res.data && res.data.length > 0) return res.data;
+  } catch {
+    // fallback
+  }
+
   const userId = getActiveUserId();
   if (!userId) return [];
   const store = getUserStore(userId);
@@ -465,13 +606,28 @@ export const fetchMonthlyStats = async (): Promise<MonthlySummary[]> => {
   return Array.from(map.values()).sort((a, b) => a.year - b.year || a.month - b.month);
 };
 
-/**
- * Fetch category statistics strictly filtered by the active user's userId
- */
 export const fetchCategoryStats = async (
   year: number,
   month?: number,
-): Promise<{ id: number; name: string; icon: string; color: string; type: 'income' | 'expense'; total: number }[]> => {
+): Promise<
+  {
+    id: number;
+    name: string;
+    icon: string;
+    color: string;
+    type: 'income' | 'expense';
+    total: number;
+  }[]
+> => {
+  try {
+    const res = await api.get('/stats/categories', {
+      params: month !== undefined ? { year, month: month + 1 } : { year },
+    });
+    if (res.data && res.data.length > 0) return res.data;
+  } catch {
+    // fallback
+  }
+
   const userId = getActiveUserId();
   if (!userId) return [];
   const store = getUserStore(userId);
@@ -497,79 +653,112 @@ export const fetchCategoryStats = async (
   })).filter((c) => c.total > 0);
 };
 
-/**
- * Fetch budgets strictly filtered by the active user's userId
- */
-export const fetchBudgets = async (_year: number, _month: number): Promise<BudgetEntry[]> => {
+export const fetchBudgets = async (year: number, month: number): Promise<BudgetEntry[]> => {
+  try {
+    const res = await api.get<BudgetEntry[]>('/budgets', { params: { year, month } });
+    if (res.data && res.data.length > 0) return res.data;
+  } catch {
+    // fallback
+  }
   const userId = getActiveUserId();
   if (!userId) return [];
   const store = getUserStore(userId);
-  return store.budgets.filter((b) => b.userId === userId);
+  return store.budgets.filter((b) => !b.userId || b.userId === userId);
 };
 
 export const putBudgetDefault = async (
   categoryId: number,
-  _year: number,
-  _month: number,
+  year: number,
+  month: number,
   amount: number,
 ) => {
-  const userId = getActiveUserId() || 'user-1';
-  const store = getUserStore(userId);
-  const foundIndex = store.budgets.findIndex((b) => b.category_id === categoryId && b.userId === userId);
-  if (foundIndex >= 0) {
-    store.budgets[foundIndex].default_amount = amount;
-  } else {
-    store.budgets.push({ category_id: categoryId, default_amount: amount, override_amount: null, userId });
-  }
-  saveUserStore(userId, store);
-  return { success: true };
-};
-
-export const deleteAllBudgets = async (categoryId: number) => {
-  const userId = getActiveUserId() || 'user-1';
-  const store = getUserStore(userId);
-  store.budgets = store.budgets.filter((b) => b.category_id !== categoryId);
-  saveUserStore(userId, store);
-  return { success: true };
-};
-
-export const putBudgetOverride = async (
-  categoryId: number,
-  _year: number,
-  _month: number,
-  amount: number,
-) => {
-  const userId = getActiveUserId() || 'user-1';
-  const store = getUserStore(userId);
-  const foundIndex = store.budgets.findIndex((b) => b.category_id === categoryId && b.userId === userId);
-  if (foundIndex >= 0) {
-    store.budgets[foundIndex].override_amount = amount;
-  } else {
-    store.budgets.push({ category_id: categoryId, default_amount: null, override_amount: amount, userId });
-  }
-  saveUserStore(userId, store);
-  return { success: true };
-};
-
-export const deleteBudgetOverride = async (categoryId: number, _year: number, _month: number) => {
-  const userId = getActiveUserId() || 'user-1';
-  const store = getUserStore(userId);
-  const foundIndex = store.budgets.findIndex((b) => b.category_id === categoryId && b.userId === userId);
-  if (foundIndex >= 0) {
-    store.budgets[foundIndex].override_amount = null;
+  try {
+    await api.put(`/budgets/${categoryId}/default`, { year, month, amount });
+  } catch {
+    const userId = getActiveUserId() || 'user-1';
+    const store = getUserStore(userId);
+    const foundIndex = store.budgets.findIndex(
+      (b) => b.category_id === categoryId && b.userId === userId,
+    );
+    if (foundIndex >= 0) {
+      store.budgets[foundIndex].default_amount = amount;
+    } else {
+      store.budgets.push({
+        category_id: categoryId,
+        default_amount: amount,
+        override_amount: null,
+        userId,
+      });
+    }
     saveUserStore(userId, store);
   }
   return { success: true };
 };
 
+export const deleteAllBudgets = async (categoryId: number) => {
+  try {
+    await api.delete(`/budgets/${categoryId}`);
+  } catch {
+    const userId = getActiveUserId() || 'user-1';
+    const store = getUserStore(userId);
+    store.budgets = store.budgets.filter((b) => b.category_id !== categoryId);
+    saveUserStore(userId, store);
+  }
+  return { success: true };
+};
+
+export const putBudgetOverride = async (
+  categoryId: number,
+  year: number,
+  month: number,
+  amount: number,
+) => {
+  try {
+    await api.put(`/budgets/${categoryId}/override/${year}/${month}`, { amount });
+  } catch {
+    const userId = getActiveUserId() || 'user-1';
+    const store = getUserStore(userId);
+    const foundIndex = store.budgets.findIndex(
+      (b) => b.category_id === categoryId && b.userId === userId,
+    );
+    if (foundIndex >= 0) {
+      store.budgets[foundIndex].override_amount = amount;
+    } else {
+      store.budgets.push({
+        category_id: categoryId,
+        default_amount: null,
+        override_amount: amount,
+        userId,
+      });
+    }
+    saveUserStore(userId, store);
+  }
+  return { success: true };
+};
+
+export const deleteBudgetOverride = async (categoryId: number, year: number, month: number) => {
+  try {
+    await api.delete(`/budgets/${categoryId}/override/${year}/${month}`);
+  } catch {
+    const userId = getActiveUserId() || 'user-1';
+    const store = getUserStore(userId);
+    const foundIndex = store.budgets.findIndex(
+      (b) => b.category_id === categoryId && b.userId === userId,
+    );
+    if (foundIndex >= 0) {
+      store.budgets[foundIndex].override_amount = null;
+      saveUserStore(userId, store);
+    }
+  }
+  return { success: true };
+};
+
 /* =========================================================================
- * Recurring Transactions (Scoped strictly to user.id via localStorage)
+ * Recurring Transactions
  * ========================================================================= */
 
 const getRecurringKey = (userId: string) => `ledgr_recurring_${userId}`;
 
-// Initial demo seed recurring transactions
-// nextDueDate is set to a past date so processDueRecurringTransactions fires on first login
 const DEFAULT_USER1_RECURRING: RecurringTransaction[] = [
   {
     id: 1001,
@@ -578,7 +767,7 @@ const DEFAULT_USER1_RECURRING: RecurringTransaction[] = [
     amount: 85000,
     type: 'income',
     category: 'Salary',
-    accountId: 2, // HDFC Savings
+    accountId: 2,
     frequency: 'monthly',
     nextDueDate: '2026-11-01',
     active: true,
@@ -590,7 +779,7 @@ const DEFAULT_USER1_RECURRING: RecurringTransaction[] = [
     amount: 649,
     type: 'expense',
     category: 'Entertainment',
-    accountId: 5, // ICICI Credit Card
+    accountId: 5,
     frequency: 'monthly',
     nextDueDate: '2026-11-01',
     active: true,
@@ -604,7 +793,7 @@ const DEFAULT_USER1_RECURRING: RecurringTransaction[] = [
     amount: 1950,
     type: 'expense',
     category: 'Bills',
-    accountId: 5, // ICICI Credit Card
+    accountId: 5,
     frequency: 'monthly',
     nextDueDate: '2026-11-18',
     active: true,
@@ -619,7 +808,7 @@ const DEFAULT_USER2_RECURRING: RecurringTransaction[] = [
     amount: 165000,
     type: 'income',
     category: 'Freelance',
-    accountId: 201, // Axis Business Current
+    accountId: 201,
     frequency: 'monthly',
     nextDueDate: '2026-11-01',
     active: true,
@@ -631,7 +820,7 @@ const DEFAULT_USER2_RECURRING: RecurringTransaction[] = [
     amount: 14500,
     type: 'expense',
     category: 'Bills',
-    accountId: 205, // HDFC Corporate Card
+    accountId: 205,
     frequency: 'monthly',
     nextDueDate: '2026-11-01',
     active: true,
@@ -645,35 +834,9 @@ function getStoredRecurring(userId: string): RecurringTransaction[] {
     try {
       const parsed: RecurringTransaction[] = JSON.parse(raw);
       const filtered = parsed.filter((r) => r.userId === userId);
-
-      // Detect stale seed data: if ALL due dates are in the far future ('2026-12-01')
-      // and none of them have been modified (i.e. still match the old default seed),
-      // force a reseed so the corrected past dates take effect.
-      const isStaleDefaults =
-        (userId === 'user-1' || userId === 'user-2') &&
-        filtered.length > 0 &&
-        filtered.every((r) => r.nextDueDate >= '2026-12-01') &&
-        // All ids match the original seed ids exactly
-        filtered.every((r) =>
-          (userId === 'user-1' ? [1001, 1002, 1003] : [2001, 2002]).includes(Number(r.id))
-        );
-
-      if (!isStaleDefaults) {
-        if (userId === 'user-1') {
-          const item1002 = filtered.find((r) => Number(r.id) === 1002);
-          if (item1002 && !item1002.paidForMemberId) {
-            item1002.paidForMemberId = 'member-leo';
-            item1002.memberId = 'member-leo';
-            localStorage.setItem(key, JSON.stringify(filtered));
-          }
-        }
-        return filtered;
-      }
-
-      // Stale seed detected — fall through to reseed below
-      localStorage.removeItem(key);
+      if (filtered.length > 0) return filtered;
     } catch {
-      // fallback to seed below
+      // fallback
     }
   }
 
@@ -691,10 +854,10 @@ function saveStoredRecurring(userId: string, items: RecurringTransaction[]) {
   localStorage.setItem(getRecurringKey(userId), JSON.stringify(items));
 }
 
-/**
- * Calculate next due date according to frequency (weekly, monthly, yearly)
- */
-export function advanceDueDate(dateStr: string, frequency: 'weekly' | 'monthly' | 'yearly'): string {
+export function advanceDueDate(
+  dateStr: string,
+  frequency: 'weekly' | 'monthly' | 'yearly',
+): string {
   const [y, m, d] = dateStr.split('-').map(Number);
   const date = new Date(y, m - 1, d);
 
@@ -712,73 +875,79 @@ export function advanceDueDate(dateStr: string, frequency: 'weekly' | 'monthly' 
   return `${nextY}-${nextM}-${nextD}`;
 }
 
-/**
- * Get all recurring transactions scoped to userId
- */
-export const fetchRecurringTransactions = async (userId?: string): Promise<RecurringTransaction[]> => {
+export const fetchRecurringTransactions = async (
+  userId?: string,
+): Promise<RecurringTransaction[]> => {
   const targetUserId = userId || getActiveUserId() || 'user-1';
+  try {
+    const res = await api.get<RecurringTransaction[]>('/recurring', {
+      params: { userId: targetUserId },
+    });
+    if (res.data && res.data.length > 0) return res.data;
+  } catch {
+    // fallback
+  }
   return getStoredRecurring(targetUserId);
 };
 
 export const getRecurringTransactions = fetchRecurringTransactions;
 
-/**
- * Add a recurring transaction scoped to userId
- */
 export const postRecurringTransaction = async (
   item: Omit<RecurringTransaction, 'id' | 'userId'> & { userId?: string },
   userId?: string,
 ): Promise<RecurringTransaction> => {
   const targetUserId = item.userId || userId || getActiveUserId() || 'user-1';
-  const list = getStoredRecurring(targetUserId);
-
-  const newItem: RecurringTransaction = {
-    ...item,
-    id: Date.now(),
-    userId: targetUserId,
-    active: item.active !== undefined ? item.active : true,
-  };
-
-  list.push(newItem);
-  saveStoredRecurring(targetUserId, list);
-  return newItem;
+  try {
+    const res = await api.post<RecurringTransaction>('/recurring', {
+      ...item,
+      userId: targetUserId,
+    });
+    return res.data;
+  } catch {
+    const list = getStoredRecurring(targetUserId);
+    const newItem: RecurringTransaction = {
+      ...item,
+      id: Date.now(),
+      userId: targetUserId,
+      active: item.active !== undefined ? item.active : true,
+    };
+    list.push(newItem);
+    saveStoredRecurring(targetUserId, list);
+    return newItem;
+  }
 };
 
 export const addRecurringTransaction = postRecurringTransaction;
 
-/**
- * Edit an existing recurring transaction scoped to userId
- */
 export const patchRecurringTransaction = async (
   id: number | string,
   updates: Partial<RecurringTransaction>,
   userId?: string,
 ): Promise<RecurringTransaction> => {
   const targetUserId = userId || getActiveUserId() || 'user-1';
-  const list = getStoredRecurring(targetUserId);
-  const index = list.findIndex((r) => String(r.id) === String(id));
-
-  if (index === -1) {
-    throw new Error(`Recurring transaction ${id} not found.`);
+  try {
+    const res = await api.patch<RecurringTransaction>(`/recurring/${id}`, updates);
+    return res.data;
+  } catch {
+    const list = getStoredRecurring(targetUserId);
+    const index = list.findIndex((r) => String(r.id) === String(id));
+    if (index === -1) {
+      throw new Error(`Recurring transaction ${id} not found.`);
+    }
+    const updated: RecurringTransaction = {
+      ...list[index],
+      ...updates,
+      id: list[index].id,
+      userId: targetUserId,
+    };
+    list[index] = updated;
+    saveStoredRecurring(targetUserId, list);
+    return updated;
   }
-
-  const updated: RecurringTransaction = {
-    ...list[index],
-    ...updates,
-    id: list[index].id,
-    userId: targetUserId,
-  };
-
-  list[index] = updated;
-  saveStoredRecurring(targetUserId, list);
-  return updated;
 };
 
 export const editRecurringTransaction = patchRecurringTransaction;
 
-/**
- * Toggle active status of a recurring transaction
- */
 export const toggleRecurringTransaction = async (
   id: number | string,
   userId?: string,
@@ -786,40 +955,44 @@ export const toggleRecurringTransaction = async (
   const targetUserId = userId || getActiveUserId() || 'user-1';
   const list = getStoredRecurring(targetUserId);
   const found = list.find((r) => String(r.id) === String(id));
-
   if (!found) {
     throw new Error(`Recurring transaction ${id} not found.`);
   }
-
   return patchRecurringTransaction(id, { active: !found.active }, targetUserId);
 };
 
-/**
- * Delete a recurring transaction scoped to userId
- */
 export const deleteRecurringTransaction = async (
   id: number | string,
   userId?: string,
 ): Promise<{ success: boolean }> => {
   const targetUserId = userId || getActiveUserId() || 'user-1';
-  const list = getStoredRecurring(targetUserId);
-  const nextList = list.filter((r) => String(r.id) !== String(id));
-  saveStoredRecurring(targetUserId, nextList);
+  try {
+    await api.delete(`/recurring/${id}`);
+  } catch {
+    const list = getStoredRecurring(targetUserId);
+    const nextList = list.filter((r) => String(r.id) !== String(id));
+    saveStoredRecurring(targetUserId, nextList);
+  }
   return { success: true };
 };
 
-/**
- * Check if any active recurring items have nextDueDate <= today.
- * If so, creates real transaction entries, pushes them to user's main transaction list,
- * updates account balance, and advances nextDueDate according to frequency.
- */
 export const processDueRecurringTransactions = async (
   userId?: string,
 ): Promise<{ processed: number; transactions: ApiTransaction[] }> => {
   const targetUserId = userId || getActiveUserId() || 'user-1';
+
+  try {
+    const res = await api.post<{ processed: number; transactions: ApiTransaction[] }>(
+      '/recurring/process',
+      { userId: targetUserId },
+    );
+    if (res.data) return res.data;
+  } catch {
+    // fallback
+  }
+
   const recurringList = getStoredRecurring(targetUserId);
   const store = getUserStore(targetUserId);
-
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
@@ -828,28 +1001,24 @@ export const processDueRecurringTransactions = async (
 
   for (let i = 0; i < recurringList.length; i++) {
     const item = recurringList[i];
-
     if (!item.active || !item.nextDueDate) continue;
 
-    // Check if nextDueDate <= today
     if (item.nextDueDate <= todayStr) {
       const rawAmt = Math.abs(item.amount);
       const signedAmt = item.type === 'expense' ? -rawAmt : rawAmt;
-
-      // Find category matching item.category
       const cat = DEFAULT_CATEGORIES.find(
         (c) => c.name.toLowerCase() === (item.category || '').toLowerCase(),
       );
-      const catId = cat ? cat.id : (item.type === 'expense' ? 10 : 1);
-      const catName = cat ? cat.name : (item.category || (item.type === 'expense' ? 'Bills' : 'Salary'));
-      const catIcon = cat ? cat.icon : (item.type === 'expense' ? 'receipt' : 'briefcase');
+      const catId = cat ? cat.id : item.type === 'expense' ? 10 : 1;
+      const catName = cat
+        ? cat.name
+        : item.category || (item.type === 'expense' ? 'Bills' : 'Salary');
+      const catIcon = cat ? cat.icon : item.type === 'expense' ? 'receipt' : 'briefcase';
 
-      // Find account
       const acc = store.accounts.find((a) => a.id === item.accountId) || store.accounts[0];
       const accountId = acc ? acc.id : item.accountId;
       const accountName = acc ? acc.name : 'Account';
 
-      // Create the real transaction
       const newTx: ApiTransaction = {
         id: Date.now() + Math.floor(Math.random() * 1000) + createdTransactions.length,
         account_id: accountId,
@@ -865,7 +1034,6 @@ export const processDueRecurringTransactions = async (
         userId: targetUserId,
       };
 
-      // Adjust account balance
       if (acc) {
         acc.balance += signedAmt;
       }
@@ -873,9 +1041,7 @@ export const processDueRecurringTransactions = async (
       store.transactions = [newTx, ...store.transactions];
       createdTransactions.push(newTx);
 
-      // Advance nextDueDate
       let nextDate = advanceDueDate(item.nextDueDate, item.frequency);
-      // Ensure nextDueDate moves into the future if several periods elapsed
       while (nextDate <= todayStr) {
         nextDate = advanceDueDate(nextDate, item.frequency);
       }

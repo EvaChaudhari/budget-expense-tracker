@@ -108,26 +108,27 @@ export default function DashboardPage(props: DashboardPageProps) {
       : 0;
 
   // Child's recent transactions (top 8)
+  const memberId = activeMember?.id;
   const childRecentTransactions = useMemo(() => {
     const list = isChild
       ? txs
-      : txs.filter((t) => t.paidForMemberId === activeMember?.id);
+      : txs.filter((t) => t.paidForMemberId === memberId);
     return list.slice(0, 8);
-  }, [txs, isChild, activeMember?.id]);
+  }, [txs, isChild, memberId]);
 
   // Filter recurring bills:
   // Hide household recurring bills from the child dashboard unless explicitly tagged with their member ID
   const visibleRecurringBills = useMemo(() => {
     return recurringList.filter((bill) => {
-      if (isChild && activeMember?.id) {
+      if (isChild && memberId) {
         return (
-          bill.paidForMemberId === activeMember.id ||
-          bill.memberId === activeMember.id
+          bill.paidForMemberId === memberId ||
+          bill.memberId === memberId
         );
       }
       return !isChild; // Show all household bills for Parent view
     });
-  }, [recurringList, isChild, activeMember?.id]);
+  }, [recurringList, isChild, memberId]);
 
   const monthName = new Date(year, month, 1).toLocaleDateString('en-US', {
     month: 'long',

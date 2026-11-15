@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 import type { User, UserSession, FamilyMember } from '../types/index.ts';
 
 export interface StoredUser extends User {
@@ -30,7 +30,7 @@ export interface AuthContextType {
   toggleRole: () => void;
 }
 
-export const DEFAULT_FAMILY_MEMBERS: Record<string, FamilyMember[]> = {
+const DEFAULT_FAMILY_MEMBERS: Record<string, FamilyMember[]> = {
   'user-1': [
     {
       id: 'member-alex',
@@ -72,7 +72,7 @@ export const DEFAULT_FAMILY_MEMBERS: Record<string, FamilyMember[]> = {
   ],
 };
 
-export const DEMO_USERS: StoredUser[] = [
+const DEMO_USERS: StoredUser[] = [
   {
     id: 'user-1',
     name: 'Alex Morgan',
@@ -98,7 +98,7 @@ const USERS_STORAGE_KEY = 'ledgr_registered_users';
 const ACTIVE_MEMBER_STORAGE_KEY = 'ledgr_active_member';
 const FAMILY_MEMBERS_STORAGE_PREFIX = 'ledgr_family_members_';
 
-export function getInitialFamilyMembers(userId: string, userName: string): FamilyMember[] {
+function getInitialFamilyMembers(userId: string, userName: string): FamilyMember[] {
   const storageKey = `${FAMILY_MEMBERS_STORAGE_PREFIX}${userId}`;
   try {
     const raw = localStorage.getItem(storageKey);
@@ -166,76 +166,91 @@ function getInitialUsers(): StoredUser[] {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserSession | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeMember, setActiveMemberState] = useState<FamilyMember | null>(null);
-  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
-
-  // Computed helper flag indicating if active member is a Child
-  const isChild = activeMember?.role === 'Child';
-
-  useEffect(() => {
+  const [user, setUser] = useState<UserSession | null>(() => {
     try {
       const stored = localStorage.getItem(AUTH_STORAGE_KEY);
       if (stored) {
         const parsedUser: UserSession = JSON.parse(stored);
-        // Ensure default currency is INR
-        if (!parsedUser.currency_symbol || parsedUser.currency_symbol === 'RM' || parsedUser.currency_symbol === '$') {
+        if (
+          !parsedUser.currency_symbol ||
+          parsedUser.currency_symbol === 'RM' ||
+          parsedUser.currency_symbol === '$'
+        ) {
           parsedUser.currency_code = 'INR';
           parsedUser.currency_symbol = '₹';
           localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(parsedUser));
         }
-        setUser(parsedUser);
+        return parsedUser;
       }
     } catch {
       localStorage.removeItem(AUTH_STORAGE_KEY);
-    } finally {
-      setIsLoading(false);
     }
-  }, []);
+    return null;
+  });
+  const [isLoading] = useState(false);
 
-  // Manage active family member whenever user session changes
-  useEffect(() => {
-    if (!user) {
-      setActiveMemberState(null);
-      setFamilyMembers([]);
-      return;
-    }
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>(() => {
+    if (!user) return [];
+    return getInitialFamilyMembers(user.id, user.name);
+  });
 
+  const [activeMember, setActiveMemberState] = useState<FamilyMember | null>(() => {
+    if (!user) return null;
     const members = getInitialFamilyMembers(user.id, user.name);
-    setFamilyMembers(members);
-
     const userKey = `${ACTIVE_MEMBER_STORAGE_KEY}_${user.id}`;
     const saved = localStorage.getItem(userKey) || localStorage.getItem(ACTIVE_MEMBER_STORAGE_KEY);
-    let resolvedMember: FamilyMember | null = null;
-
     if (saved) {
       try {
         const parsed: FamilyMember = JSON.parse(saved);
         const match = members.find((m) => m.id === parsed.id);
-        if (match) {
-          resolvedMember = match;
+        if (match) return match;
+      } catch {
+        // ignore
+      }
+    }
+    return members.find((m) => m.role === 'Parent') || members[0] || null;
+  });
+
+  // Keep familyMembers & activeMember synchronized when user changes
+  const [prevUserId, setPrevUserId] = useState(user?.id);
+  if (user?.id !== prevUserId) {
+    setPrevUserId(user?.id);
+    if (!user) {
+      setActiveMemberState(null);
+      setFamilyMembers([]);
+    } else {
+      const members = getInitialFamilyMembers(user.id, user.name);
+      setFamilyMembers(members);
+      const userKey = `${ACTIVE_MEMBER_STORAGE_KEY}_${user.id}`;
+      const saved =
+        localStorage.getItem(userKey) || localStorage.getItem(ACTIVE_MEMBER_STORAGE_KEY);
+      let resolvedMember: FamilyMember | null = null;
+      if (saved) {
+        try {
+          const parsed: FamilyMember = JSON.parse(saved);
+          const match = members.find((m) => m.id === parsed.id);
+          if (match) resolvedMember = match;
+        } catch {
+          // ignore
         }
-      } catch {
-        // ignore JSON parse error
+      }
+      if (!resolvedMember) {
+        resolvedMember = members.find((m) => m.role === 'Parent') || members[0] || null;
+      }
+      setActiveMemberState(resolvedMember);
+      if (resolvedMember) {
+        try {
+          localStorage.setItem(userKey, JSON.stringify(resolvedMember));
+          localStorage.setItem(ACTIVE_MEMBER_STORAGE_KEY, JSON.stringify(resolvedMember));
+        } catch {
+          // ignore
+        }
       }
     }
+  }
 
-    // Default to Parent role if no valid member is cached
-    if (!resolvedMember) {
-      resolvedMember = members.find((m) => m.role === 'Parent') || members[0] || null;
-    }
-
-    setActiveMemberState(resolvedMember);
-    if (resolvedMember) {
-      try {
-        localStorage.setItem(userKey, JSON.stringify(resolvedMember));
-        localStorage.setItem(ACTIVE_MEMBER_STORAGE_KEY, JSON.stringify(resolvedMember));
-      } catch {
-        // ignore storage error
-      }
-    }
-  }, [user?.id]);
+  // Computed helper flag indicating if active member is a Child
+  const isChild = activeMember?.role === 'Child';
 
   const setActiveMember = (member: FamilyMember | null) => {
     setActiveMemberState(member);

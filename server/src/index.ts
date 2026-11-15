@@ -10,6 +10,10 @@ import transactionsRouter from './routes/transactions.route.js';
 import statsRouter from './routes/stats.route.js';
 import budgetsRouter from './routes/budgets.route.js';
 import accountGroupsRouter from './routes/account_groups.route.js';
+import paymentMethodsRouter from './routes/payment_methods.route.js';
+import recurringRouter from './routes/recurring.route.js';
+import familyMembersRouter from './routes/family_members.route.js';
+import childBudgetsRouter from './routes/child_budgets.route.js';
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -50,6 +54,18 @@ app.use('/api/stats', statsRouter);
 
 app.use('/budgets', budgetsRouter);
 app.use('/api/budgets', budgetsRouter);
+
+app.use('/payment-methods', paymentMethodsRouter);
+app.use('/api/payment-methods', paymentMethodsRouter);
+
+app.use('/recurring', recurringRouter);
+app.use('/api/recurring', recurringRouter);
+
+app.use('/family-members', familyMembersRouter);
+app.use('/api/family-members', familyMembersRouter);
+
+app.use('/child-budgets', childBudgetsRouter);
+app.use('/api/child-budgets', childBudgetsRouter);
 
 app.use(errorHandler);
 

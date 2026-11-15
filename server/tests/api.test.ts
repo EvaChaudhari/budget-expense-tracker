@@ -225,3 +225,53 @@ test('API: Domain Rule Enforcement (Budgets & Category Reassignment)', async () 
   assert.equal(crossReassignRes.status, 400);
   assert.match(crossReassignRes.body.error, /different flow type/i);
 });
+
+test('API: Payment Methods Endpoints', async () => {
+  const getRes = await request(app).get('/api/payment-methods');
+  assert.equal(getRes.status, 200);
+  assert.ok(Array.isArray(getRes.body));
+  assert.ok(getRes.body.length >= 4);
+
+  const postRes = await request(app)
+    .post('/api/payment-methods')
+    .send({ name: 'Cryptocurrency', icon: 'bitcoin' });
+  assert.equal(postRes.status, 201);
+  const createdId = postRes.body.id;
+
+  const patchRes = await request(app)
+    .patch(`/api/payment-methods/${createdId}`)
+    .send({ name: 'Crypto Wallet' });
+  assert.equal(patchRes.status, 200);
+  assert.equal(patchRes.body.name, 'Crypto Wallet');
+
+  const delRes = await request(app).delete(`/api/payment-methods/${createdId}`);
+  assert.equal(delRes.status, 204);
+});
+
+test('API: Recurring Transactions & Family Budget Endpoints', async () => {
+  // Recurring list
+  const recurRes = await request(app).get('/api/recurring?userId=user-1');
+  assert.equal(recurRes.status, 200);
+  assert.ok(Array.isArray(recurRes.body));
+
+  // Family members list
+  const membersRes = await request(app).get('/api/family-members?userId=user-1');
+  assert.equal(membersRes.status, 200);
+  assert.ok(Array.isArray(membersRes.body));
+  assert.ok(membersRes.body.some((m: any) => m.name === 'Alex Morgan'));
+
+  // Child budgets upsert & delete
+  const upsertRes = await request(app)
+    .put('/api/child-budgets/member-leo/6')
+    .send({ amount: 1200, userId: 'user-1' });
+  assert.equal(upsertRes.status, 200);
+  assert.equal(upsertRes.body.amount, 1200);
+
+  const getChildRes = await request(app).get('/api/child-budgets?memberId=member-leo');
+  assert.equal(getChildRes.status, 200);
+  assert.ok(getChildRes.body.some((b: any) => b.categoryId === 6 && b.amount === 1200));
+
+  const delChildRes = await request(app).delete('/api/child-budgets/member-leo/6');
+  assert.equal(delChildRes.status, 204);
+});
+

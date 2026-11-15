@@ -17,6 +17,8 @@ const idParamSchema = z.object({
 const txQuerySchema = z.object({
   year: z.coerce.number().int().min(1900).max(2100).optional(),
   month: z.coerce.number().int().min(1).max(12).optional(),
+  userId: z.string().optional(),
+  paidForMemberId: z.string().optional(),
 });
 
 const txSchema = z.object({
@@ -30,6 +32,11 @@ const txSchema = z.object({
     .string()
     .regex(/^\d{2}:\d{2}(:\d{2})?$/)
     .optional(),
+  payment_method_id: z.number().int().positive().nullable().optional(),
+  userId: z.string().optional(),
+  user_id: z.string().optional(),
+  paidForMemberId: z.string().nullable().optional(),
+  paid_for_member_id: z.string().nullable().optional(),
 });
 
 router.get('/', validateQuery(txQuerySchema), getTransactions);

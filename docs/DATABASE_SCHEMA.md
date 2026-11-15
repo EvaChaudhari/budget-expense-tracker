@@ -22,7 +22,7 @@ This document details the relational schema, entity relationships, integrity con
 
 ## 2. Formal Relational Schema Notation
 
-The database consists of **7 relations**. Underlined attributes indicate **Primary Keys (PK)**; asterisked attributes (`*`) indicate **Foreign Keys (FK)**.
+The database consists of **11 relations**. Underlined attributes indicate **Primary Keys (PK)**; asterisked attributes (`*`) indicate **Foreign Keys (FK)**.
 
 1. **`settings`** (
    <u>`id`</u>, `week_start`, `currency_country`, `currency_code`, `currency_symbol`, `unit_position`, `created_at`, `updated_at`
@@ -31,7 +31,7 @@ The database consists of **7 relations**. Underlined attributes indicate **Prima
    <u>`id`</u>, `name`, `sort_order`
    )
 3. **`accounts`** (
-   <u>`id`</u>, `name`, `type`, `icon`, `color`, `balance`, `group_id`*, `created_at`, `updated_at`
+   <u>`id`</u>, `name`, `type`, `icon`, `color`, `balance`, `group_id`*, `user_id`, `created_at`, `updated_at`
    )
 4. **`categories`** (
    <u>`id`</u>, `name`, `type`, `icon`
@@ -42,8 +42,20 @@ The database consists of **7 relations**. Underlined attributes indicate **Prima
 6. **`budget_overrides`** (
    <u>`id`</u>, `category_id`*, `year`, `month`, `amount`, `created_at`, `updated_at`
    )
-7. **`transactions`** (
-   <u>`id`</u>, `account_id`*, `category_id`*, `amount`, `note`, `description`, `tx_date`, `tx_time`, `created_at`, `updated_at`
+7. **`payment_methods`** (
+   <u>`id`</u>, `name`, `icon`, `created_at`
+   )
+8. **`transactions`** (
+   <u>`id`</u>, `account_id`*, `category_id`*, `amount`, `note`, `description`, `tx_date`, `tx_time`, `payment_method_id`*, `user_id`, `paid_for_member_id`, `created_at`, `updated_at`
+   )
+9. **`recurring_transactions`** (
+   <u>`id`</u>, `user_id`, `title`, `amount`, `type`, `category`, `account_id`*, `frequency`, `next_due_date`, `active`, `paid_for_member_id`, `created_at`, `updated_at`
+   )
+10. **`family_members`** (
+   <u>`id`</u>, `user_id`, `name`, `role`, `monthly_allowance`, `avatar`, `email`, `created_at`
+   )
+11. **`child_budget_limits`** (
+   <u>`id`</u>, `user_id`, `member_id`, `category_id`*, `amount`, `created_at`, `updated_at`
    )
 
 ---

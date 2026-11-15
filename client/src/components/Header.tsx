@@ -1,2 +1,3 @@
-export { default } from './layout/Header.tsx';
-export * from './layout/Header.tsx';
+import Header from './layout/Header.tsx';
+export default Header;
+export type { HeaderProps } from './layout/Header.tsx';

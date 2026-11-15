@@ -227,6 +227,21 @@ All endpoints are prefixed with `/api`.
 | GET    | `/api/stats/categories`                          | Category breakdown for a period       |
 | GET    | `/api/settings`                                  | Get user settings                     |
 | PATCH  | `/api/settings`                                  | Update user settings                  |
+| GET    | `/api/payment-methods`                           | List all payment methods              |
+| POST   | `/api/payment-methods`                           | Create a payment method               |
+| PATCH  | `/api/payment-methods/:id`                       | Update a payment method               |
+| DELETE | `/api/payment-methods/:id`                       | Delete a payment method               |
+| GET    | `/api/recurring`                                 | List recurring transactions (by user) |
+| POST   | `/api/recurring`                                 | Create recurring rule                 |
+| PATCH  | `/api/recurring/:id`                             | Update recurring rule                 |
+| DELETE | `/api/recurring/:id`                             | Delete recurring rule                 |
+| POST   | `/api/recurring/process`                         | Automatically process due recurring tx |
+| GET    | `/api/family-members`                            | List family members (Parent/Child)    |
+| POST   | `/api/family-members`                            | Add family member                     |
+| DELETE | `/api/family-members/:id`                        | Delete family member                  |
+| GET    | `/api/child-budgets`                             | List child member category limits     |
+| PUT    | `/api/child-budgets/:memberId/:categoryId`       | Upsert personal child category budget |
+| DELETE | `/api/child-budgets/:memberId/:categoryId`       | Remove child personal category limit  |
 
 ---
 

@@ -293,3 +293,95 @@ INSERT IGNORE INTO transactions (id, account_id, category_id, amount, note, tx_d
 (124, 5, 10, -178.00, 'TNB + Unifi bill',              '2026-05-05', '09:00:00'),
 (125, 5, 11,  -88.00, 'Netflix + GSC',                 '2026-05-22', '20:00:00'),
 (126, 5, 8,  -290.00, 'Pavilion shopping',             '2026-05-28', '15:30:00');
+
+-- ─── Payment Methods ──────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS payment_methods (
+  id   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(50) NOT NULL,
+  icon VARCHAR(50) NOT NULL DEFAULT 'credit-card',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT IGNORE INTO payment_methods (id, name, icon) VALUES
+  (1, 'Cash', 'banknote'),
+  (2, 'Credit / Debit Card', 'credit-card'),
+  (3, 'Bank Transfer', 'landmark'),
+  (4, 'E-Wallet', 'smartphone');
+
+-- ─── Extended Attributes on Accounts & Transactions ─────────────────────────
+
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'transactions' AND column_name = 'payment_method_id');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE transactions ADD COLUMN payment_method_id INT UNSIGNED NULL, ADD CONSTRAINT fk_tx_pm FOREIGN KEY (payment_method_id) REFERENCES payment_methods(id) ON DELETE SET NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'transactions' AND column_name = 'user_id');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE transactions ADD COLUMN user_id VARCHAR(50) NULL DEFAULT \'user-1\'', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'transactions' AND column_name = 'paid_for_member_id');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE transactions ADD COLUMN paid_for_member_id VARCHAR(50) NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'accounts' AND column_name = 'user_id');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE accounts ADD COLUMN user_id VARCHAR(50) NULL DEFAULT \'user-1\'', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ─── Recurring Transactions ──────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS recurring_transactions (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id VARCHAR(50) NOT NULL DEFAULT 'user-1',
+  title VARCHAR(150) NOT NULL,
+  amount DECIMAL(15,2) NOT NULL,
+  type ENUM('income','expense') NOT NULL,
+  category VARCHAR(100) NOT NULL,
+  account_id INT UNSIGNED NOT NULL,
+  frequency ENUM('weekly','monthly','yearly') NOT NULL DEFAULT 'monthly',
+  next_due_date DATE NOT NULL,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  paid_for_member_id VARCHAR(50) NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_recurring_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE RESTRICT
+);
+
+-- ─── Family Members & Child Budgets ──────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS family_members (
+  id VARCHAR(50) PRIMARY KEY,
+  user_id VARCHAR(50) NOT NULL DEFAULT 'user-1',
+  name VARCHAR(100) NOT NULL,
+  role ENUM('Parent','Child') NOT NULL,
+  monthly_allowance DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  avatar VARCHAR(10) NULL,
+  email VARCHAR(150) NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS child_budget_limits (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id VARCHAR(50) NOT NULL DEFAULT 'user-1',
+  member_id VARCHAR(50) NOT NULL,
+  category_id INT UNSIGNED NOT NULL,
+  amount DECIMAL(15,2) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_member_cat (member_id, category_id),
+  CONSTRAINT fk_cbl_cat FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+);
+
+INSERT IGNORE INTO family_members (id, user_id, name, role, monthly_allowance, avatar) VALUES
+  ('member-alex', 'user-1', 'Alex Morgan', 'Parent', 0, 'AM'),
+  ('member-leo', 'user-1', 'Leo Morgan', 'Child', 2500, 'LM'),
+  ('member-maya', 'user-1', 'Maya Morgan', 'Child', 1500, 'MM'),
+  ('member-sarah', 'user-2', 'Sarah Chen', 'Parent', 0, 'SC'),
+  ('member-lucas', 'user-2', 'Lucas Chen', 'Child', 3000, 'LC');
+
+INSERT IGNORE INTO recurring_transactions (id, user_id, title, amount, type, category, account_id, frequency, next_due_date, active, paid_for_member_id) VALUES
+  (1001, 'user-1', 'Monthly Salary', 85000.00, 'income', 'Salary', 2, 'monthly', '2026-11-01', 1, NULL),
+  (1002, 'user-1', 'Netflix 4K Subscription', 649.00, 'expense', 'Entertainment', 5, 'monthly', '2026-11-01', 1, 'member-leo'),
+  (1003, 'user-1', 'Electricity & Jio Fiber Internet', 1950.00, 'expense', 'Bills', 5, 'monthly', '2026-11-18', 1, NULL),
+  (2001, 'user-2', 'Client UX Retainer Payout', 165000.00, 'income', 'Freelance', 2, 'monthly', '2026-11-01', 1, NULL),
+  (2002, 'user-2', 'AWS India Cloud Infrastructure', 14500.00, 'expense', 'Bills', 5, 'monthly', '2026-11-01', 1, NULL);
+

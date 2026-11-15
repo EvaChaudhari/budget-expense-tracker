@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext.tsx';
 import type {
   Account,
@@ -253,19 +253,20 @@ export function useBudgetData(year?: number, month?: number) {
     return getUserStore(userId);
   });
 
-  // Re-load when active user changes
-  useEffect(() => {
-    if (userId) {
-      setStore(getUserStore(userId));
-    } else {
-      setStore({
-        accounts: [],
-        transactions: [],
-        budgets: [],
-        settings: USER1_SETTINGS,
-      });
-    }
-  }, [userId]);
+  const [prevUserId, setPrevUserId] = useState(userId);
+  if (userId !== prevUserId) {
+    setPrevUserId(userId);
+    setStore(
+      userId
+        ? getUserStore(userId)
+        : {
+            accounts: [],
+            transactions: [],
+            budgets: [],
+            settings: USER1_SETTINGS,
+          },
+    );
+  }
 
   const updateStore = useCallback(
     (updater: (prev: UserFinancialStore) => UserFinancialStore) => {

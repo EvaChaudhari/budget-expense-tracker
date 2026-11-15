@@ -11,7 +11,26 @@ interface DbTransaction {
   description: string | null;
   tx_date: string;
   tx_time: string;
+  payment_method_id?: number | null;
+  user_id?: string | null;
+  paid_for_member_id?: string | null;
 }
+
+const SELECT_TRANSACTION_SQL = `
+  SELECT t.id, t.account_id, t.category_id, t.amount, t.note, t.description,
+         DATE_FORMAT(t.tx_date, '%Y-%m-%d') AS tx_date,
+         t.tx_time,
+         t.payment_method_id,
+         t.user_id AS userId,
+         t.paid_for_member_id AS paidForMemberId,
+         c.name AS category_name, c.icon AS category_icon,
+         a.name AS account_name,
+         pm.name AS payment_method_name, pm.icon AS payment_method_icon
+  FROM transactions t
+  JOIN categories c ON t.category_id = c.id
+  JOIN accounts   a ON t.account_id  = a.id
+  LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
+`;
 
 export const getTransactions = async (
   req: Request,
@@ -19,23 +38,35 @@ export const getTransactions = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { year, month } = req.query;
-    let sql = `
-      SELECT t.*, c.name AS category_name, c.icon AS category_icon, a.name AS account_name
-      FROM transactions t
-      JOIN categories c ON t.category_id = c.id
-      JOIN accounts   a ON t.account_id  = a.id
-    `;
+    const { year, month, userId, paidForMemberId } = req.query;
+    let sql = SELECT_TRANSACTION_SQL;
+    const conditions: string[] = [];
     const params: (string | number)[] = [];
+
     if (year !== undefined && year !== '') {
-      sql += ' WHERE YEAR(t.tx_date) = ?';
+      conditions.push('YEAR(t.tx_date) = ?');
       params.push(Number(year));
       if (month !== undefined && month !== '') {
-        sql += ' AND MONTH(t.tx_date) = ?';
+        conditions.push('MONTH(t.tx_date) = ?');
         params.push(Number(month));
       }
     }
-    sql += ' ORDER BY t.tx_date DESC, t.tx_time DESC';
+
+    if (userId !== undefined && userId !== '') {
+      conditions.push('(t.user_id = ? OR t.user_id IS NULL)');
+      params.push(String(userId));
+    }
+
+    if (paidForMemberId !== undefined && paidForMemberId !== '') {
+      conditions.push('t.paid_for_member_id = ?');
+      params.push(String(paidForMemberId));
+    }
+
+    if (conditions.length > 0) {
+      sql += ` WHERE ${conditions.join(' AND ')}`;
+    }
+
+    sql += ' ORDER BY t.tx_date DESC, t.tx_time DESC, t.id DESC';
     const [rows] = await pool.query(sql, params);
     res.json(rows);
   } catch (err) {
@@ -50,7 +81,23 @@ export const createTransaction = async (
 ): Promise<void> => {
   const conn = await pool.getConnection();
   try {
-    const { account_id, category_id, amount, note, description, tx_date, tx_time } = req.body;
+    const {
+      account_id,
+      category_id,
+      amount,
+      note,
+      description,
+      tx_date,
+      tx_time,
+      payment_method_id = null,
+      userId = null,
+      user_id = null,
+      paidForMemberId = null,
+      paid_for_member_id = null,
+    } = req.body;
+
+    const finalUserId = userId || user_id || 'user-1';
+    const finalPaidFor = paidForMemberId || paid_for_member_id || null;
 
     await conn.beginTransaction();
 
@@ -72,8 +119,21 @@ export const createTransaction = async (
 
     // Insert transaction
     const [result] = (await conn.query(
-      'INSERT INTO transactions (account_id, category_id, amount, note, description, tx_date, tx_time) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [account_id, category_id, amount, note, description ?? null, tx_date, tx_time ?? '00:00:00'],
+      `INSERT INTO transactions
+         (account_id, category_id, amount, note, description, tx_date, tx_time, payment_method_id, user_id, paid_for_member_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        account_id,
+        category_id,
+        amount,
+        note,
+        description ?? null,
+        tx_date,
+        tx_time ?? '00:00:00',
+        payment_method_id ?? null,
+        finalUserId,
+        finalPaidFor,
+      ],
     )) as unknown as [{ insertId: number }];
 
     // Synchronize account balance atomically
@@ -84,11 +144,7 @@ export const createTransaction = async (
 
     // Retrieve full populated record
     const [rows] = (await conn.query(
-      `SELECT t.*, c.name AS category_name, c.icon AS category_icon, a.name AS account_name
-       FROM transactions t
-       JOIN categories c ON t.category_id = c.id
-       JOIN accounts   a ON t.account_id  = a.id
-       WHERE t.id = ?`,
+      `${SELECT_TRANSACTION_SQL} WHERE t.id = ?`,
       [result.insertId],
     )) as unknown as [unknown[]];
 
@@ -131,6 +187,16 @@ export const updateTransaction = async (
       'description' in req.body ? (req.body.description ?? null) : current.description;
     const newTxDate = req.body.tx_date !== undefined ? req.body.tx_date : current.tx_date;
     const newTxTime = req.body.tx_time !== undefined ? req.body.tx_time : current.tx_time;
+    const newPmId =
+      'payment_method_id' in req.body ? (req.body.payment_method_id ?? null) : current.payment_method_id;
+    const newUserId =
+      req.body.userId || req.body.user_id || current.user_id || 'user-1';
+    const newPaidFor =
+      'paidForMemberId' in req.body
+        ? req.body.paidForMemberId
+        : 'paid_for_member_id' in req.body
+        ? req.body.paid_for_member_id
+        : current.paid_for_member_id;
 
     // Verify account exists if changed
     if (newAccountId !== current.account_id) {
@@ -175,7 +241,10 @@ export const updateTransaction = async (
     }
 
     await conn.query(
-      'UPDATE transactions SET account_id=?, category_id=?, amount=?, note=?, description=?, tx_date=?, tx_time=? WHERE id=?',
+      `UPDATE transactions
+       SET account_id=?, category_id=?, amount=?, note=?, description=?, tx_date=?, tx_time=?,
+           payment_method_id=?, user_id=?, paid_for_member_id=?
+       WHERE id=?`,
       [
         newAccountId,
         newCategoryId,
@@ -184,16 +253,15 @@ export const updateTransaction = async (
         newDescription,
         newTxDate,
         newTxTime,
+        newPmId,
+        newUserId,
+        newPaidFor,
         req.params.id,
       ],
     );
 
     const [rows] = (await conn.query(
-      `SELECT t.*, c.name AS category_name, c.icon AS category_icon, a.name AS account_name
-       FROM transactions t
-       JOIN categories c ON t.category_id = c.id
-       JOIN accounts   a ON t.account_id  = a.id
-       WHERE t.id = ?`,
+      `${SELECT_TRANSACTION_SQL} WHERE t.id = ?`,
       [req.params.id],
     )) as unknown as [unknown[]];
 
