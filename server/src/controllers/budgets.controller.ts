@@ -52,6 +52,9 @@ export const upsertDefault = async (
     if (!cat || cat.length === 0) {
       throw new AppError(404, 'Category not found');
     }
+    if (cat[0].type !== 'expense') {
+      throw new AppError(400, 'Budgets can only be set for expense categories');
+    }
 
     await pool.query(
       `INSERT INTO budget_defaults (category_id, start_year, start_month, amount)
@@ -103,11 +106,14 @@ export const upsertOverride = async (
     const { categoryId, year, month } = req.params;
     const { amount } = req.body;
 
-    const [cat] = (await pool.query('SELECT id FROM categories WHERE id = ?', [
+    const [cat] = (await pool.query('SELECT id, type FROM categories WHERE id = ?', [
       categoryId,
-    ])) as unknown as [unknown[]];
+    ])) as unknown as [{ id: number; type: string }[]];
     if (!cat || cat.length === 0) {
       throw new AppError(404, 'Category not found');
+    }
+    if (cat[0].type !== 'expense') {
+      throw new AppError(400, 'Budgets can only be set for expense categories');
     }
 
     await pool.query(

@@ -188,4 +188,40 @@ test('API: Transactions Validation & Missing Resource Handling', async () => {
   // Missing transaction -> 404
   const notFoundRes = await request(app).delete('/api/transactions/999999');
   assert.equal(notFoundRes.status, 404);
+
+  // Non-numeric ID in path parameter -> 400
+  const invalidIdRes = await request(app).delete('/api/transactions/not-a-number');
+  assert.equal(invalidIdRes.status, 400);
+  assert.equal(invalidIdRes.body.error, 'Validation error');
+
+  // Year-only query parameter filtering
+  const yearOnlyRes = await request(app).get('/api/transactions?year=2026');
+  assert.equal(yearOnlyRes.status, 200);
+  assert.ok(Array.isArray(yearOnlyRes.body));
+  assert.ok(yearOnlyRes.body.length > 0);
+  for (const tx of yearOnlyRes.body) {
+    assert.ok(tx.tx_date.startsWith('2026'), 'Transaction date must start with 2026');
+  }
+});
+
+test('API: Domain Rule Enforcement (Budgets & Category Reassignment)', async () => {
+  // Category 1 is 'Salary' (income) -> cannot set budget
+  const incomeBudgetRes = await request(app)
+    .put('/api/budgets/1/default')
+    .send({ year: 2026, month: 6, amount: 500 });
+  assert.equal(incomeBudgetRes.status, 400);
+  assert.match(incomeBudgetRes.body.error, /expense categories/i);
+
+  const incomeOverrideRes = await request(app)
+    .put('/api/budgets/1/override/2026/6')
+    .send({ amount: 600 });
+  assert.equal(incomeOverrideRes.status, 400);
+  assert.match(incomeOverrideRes.body.error, /expense categories/i);
+
+  // Category 6 is 'Food & Dining' (expense) -> cannot reassign to Category 1 (income)
+  const crossReassignRes = await request(app)
+    .delete('/api/categories/6')
+    .send({ reassignTo: 1 });
+  assert.equal(crossReassignRes.status, 400);
+  assert.match(crossReassignRes.body.error, /different flow type/i);
 });

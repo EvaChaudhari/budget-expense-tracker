@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { validate } from '../middleware/validate.js';
+import { validate, validateParams } from '../middleware/validate.js';
 import {
   getCategories,
   createCategory,
@@ -9,6 +9,10 @@ import {
 } from '../controllers/categories.controller.js';
 
 const router = Router();
+
+const idParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
 
 const categorySchema = z.object({
   name: z.string().min(1).max(100),
@@ -23,7 +27,7 @@ const categoryUpdateSchema = z.object({
 
 router.get('/', getCategories);
 router.post('/', validate(categorySchema), createCategory);
-router.patch('/:id', validate(categoryUpdateSchema), updateCategory);
-router.delete('/:id', deleteCategory);
+router.patch('/:id', validateParams(idParamSchema), validate(categoryUpdateSchema), updateCategory);
+router.delete('/:id', validateParams(idParamSchema), deleteCategory);
 
 export default router;

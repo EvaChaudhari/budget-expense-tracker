@@ -84,9 +84,9 @@ export const deleteCategory = async (
     const { id } = req.params;
     const { reassignTo } = (req.body ?? {}) as { reassignTo?: number };
 
-    const [existing] = (await conn.query('SELECT id FROM categories WHERE id = ?', [
+    const [existing] = (await conn.query('SELECT id, type FROM categories WHERE id = ?', [
       id,
-    ])) as unknown as [unknown[]];
+    ])) as unknown as [{ id: number; type: string }[]];
     if (!existing || existing.length === 0) {
       throw new AppError(404, 'Category not found');
     }
@@ -95,11 +95,17 @@ export const deleteCategory = async (
       if (Number(reassignTo) === Number(id)) {
         throw new AppError(400, 'Cannot reassign transactions to the category being deleted');
       }
-      const [target] = (await conn.query('SELECT id FROM categories WHERE id = ?', [
+      const [target] = (await conn.query('SELECT id, type FROM categories WHERE id = ?', [
         reassignTo,
-      ])) as unknown as [unknown[]];
+      ])) as unknown as [{ id: number; type: string }[]];
       if (!target || target.length === 0) {
         throw new AppError(400, 'Target category for reassignment does not exist');
+      }
+      if (target[0].type !== existing[0].type) {
+        throw new AppError(
+          400,
+          `Cannot reassign transactions to a category of different flow type: source is '${existing[0].type}' but target is '${target[0].type}'`,
+        );
       }
 
       await conn.beginTransaction();

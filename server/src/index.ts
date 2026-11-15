@@ -14,8 +14,12 @@ import accountGroupsRouter from './routes/account_groups.route.js';
 const app = express();
 const PORT = process.env.PORT ?? 3001;
 
+const allowedOrigins = process.env.CLIENT_URL
+  ? [process.env.CLIENT_URL]
+  : ['http://localhost:5173', 'http://127.0.0.1:5173'];
+
 app.use(helmet());
-app.use(cors({ origin: process.env.CLIENT_URL ?? 'http://localhost:5173' }));
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 
 app.get('/health', (_req, res) => {

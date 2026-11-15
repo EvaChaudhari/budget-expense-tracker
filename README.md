@@ -165,7 +165,7 @@ The server reads the following variables from `server/.env` (or environment defa
 | `DB_PORT`     | `3306`                  | MySQL port                                       |
 | `DB_NAME`     | `ledgr`                 | Database name                                    |
 | `DB_USER`     | `ledgr`                 | Database user                                    |
-| `DB_PASSWORD` | `ledgr_password`        | Database password                                |
+| `DB_PASSWORD` | `ledgr_password`        | Database password (also accepts `DB_PASS`)       |
 
 ---
 

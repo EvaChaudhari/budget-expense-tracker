@@ -27,9 +27,13 @@ export const getTransactions = async (
       JOIN accounts   a ON t.account_id  = a.id
     `;
     const params: (string | number)[] = [];
-    if (year !== undefined && month !== undefined && year !== '' && month !== '') {
-      sql += ' WHERE YEAR(t.tx_date) = ? AND MONTH(t.tx_date) = ?';
-      params.push(Number(year), Number(month));
+    if (year !== undefined && year !== '') {
+      sql += ' WHERE YEAR(t.tx_date) = ?';
+      params.push(Number(year));
+      if (month !== undefined && month !== '') {
+        sql += ' AND MONTH(t.tx_date) = ?';
+        params.push(Number(month));
+      }
     }
     sql += ' ORDER BY t.tx_date DESC, t.tx_time DESC';
     const [rows] = await pool.query(sql, params);

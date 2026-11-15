@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { validate } from '../middleware/validate.js';
+import { validate, validateParams } from '../middleware/validate.js';
 import {
   getAccounts,
   createAccount,
@@ -9,6 +9,10 @@ import {
 } from '../controllers/accounts.controller.js';
 
 const router = Router();
+
+const idParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
 
 const accountSchema = z.object({
   name: z.string().min(1).max(100),
@@ -21,7 +25,7 @@ const accountSchema = z.object({
 
 router.get('/', getAccounts);
 router.post('/', validate(accountSchema), createAccount);
-router.patch('/:id', validate(accountSchema.partial()), updateAccount);
-router.delete('/:id', deleteAccount);
+router.patch('/:id', validateParams(idParamSchema), validate(accountSchema.partial()), updateAccount);
+router.delete('/:id', validateParams(idParamSchema), deleteAccount);
 
 export default router;

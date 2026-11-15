@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { validate } from '../middleware/validate.js';
+import { validate, validateParams, validateQuery } from '../middleware/validate.js';
 import {
   getTransactions,
   createTransaction,
@@ -9,6 +9,15 @@ import {
 } from '../controllers/transactions.controller.js';
 
 const router = Router();
+
+const idParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+const txQuerySchema = z.object({
+  year: z.coerce.number().int().min(1900).max(2100).optional(),
+  month: z.coerce.number().int().min(1).max(12).optional(),
+});
 
 const txSchema = z.object({
   account_id: z.number().int().positive(),
@@ -23,9 +32,9 @@ const txSchema = z.object({
     .optional(),
 });
 
-router.get('/', getTransactions);
+router.get('/', validateQuery(txQuerySchema), getTransactions);
 router.post('/', validate(txSchema), createTransaction);
-router.patch('/:id', validate(txSchema.partial()), updateTransaction);
-router.delete('/:id', deleteTransaction);
+router.patch('/:id', validateParams(idParamSchema), validate(txSchema.partial()), updateTransaction);
+router.delete('/:id', validateParams(idParamSchema), deleteTransaction);
 
 export default router;
