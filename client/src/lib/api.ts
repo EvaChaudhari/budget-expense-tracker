@@ -270,7 +270,16 @@ export const fetchAccounts = async (): Promise<Account[]> => {
   const userId = getActiveUserId() || 'user-1';
   try {
     const res = await api.get<Account[]>('/accounts', { params: { userId } });
-    if (res.data && res.data.length > 0) return res.data;
+    if (res.data && res.data.length > 0) {
+      try {
+        const store = getUserStore(userId);
+        store.accounts = res.data;
+        saveUserStore(userId, store);
+      } catch {
+        // ignore
+      }
+      return res.data;
+    }
   } catch {
     // fallback
   }
@@ -420,7 +429,7 @@ export const getTransactions = async (
     if (memberId) params.paidForMemberId = memberId;
 
     const res = await api.get<ApiTransaction[]>('/transactions', { params });
-    if (Array.isArray(res.data)) {
+    if (Array.isArray(res.data) && res.data.length > 0) {
       return res.data;
     }
   } catch {
@@ -621,14 +630,14 @@ export const deleteTransaction = async (id: number): Promise<{ success: boolean 
 };
 
 export const fetchMonthlyStats = async (): Promise<MonthlySummary[]> => {
+  const userId = getActiveUserId() || 'user-1';
   try {
-    const res = await api.get<MonthlySummary[]>('/stats/monthly');
+    const res = await api.get<MonthlySummary[]>('/stats/monthly', { params: { userId } });
     if (res.data && res.data.length > 0) return res.data;
   } catch {
     // fallback
   }
 
-  const userId = getActiveUserId();
   if (!userId) return [];
   const store = getUserStore(userId);
   const map = new Map<string, { year: number; month: number; income: number; expenses: number }>();
@@ -661,16 +670,16 @@ export const fetchCategoryStats = async (
     total: number;
   }[]
 > => {
+  const userId = getActiveUserId() || 'user-1';
   try {
     const res = await api.get('/stats/categories', {
-      params: month !== undefined ? { year, month: month + 1 } : { year },
+      params: month !== undefined ? { year, month: month + 1, userId } : { year, userId },
     });
     if (res.data && res.data.length > 0) return res.data;
   } catch {
     // fallback
   }
 
-  const userId = getActiveUserId();
   if (!userId) return [];
   const store = getUserStore(userId);
   const totals = new Map<number, number>();

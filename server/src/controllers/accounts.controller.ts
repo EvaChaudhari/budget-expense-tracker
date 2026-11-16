@@ -16,7 +16,21 @@ export const getAccounts = async (
       params.push(userId);
     }
     sql += ' ORDER BY group_id IS NULL, group_id, name';
-    const [rows] = await pool.query(sql, params);
+    const [rows] = (await pool.query(sql, params)) as [unknown[]];
+
+    // If a registered user has no accounts in MySQL yet, auto-provision starter accounts
+    if (userId && rows.length === 0) {
+      await pool.query(
+        `INSERT INTO accounts (name, type, icon, color, balance, group_id, user_id) VALUES 
+         ('Salary Account', 'Checking', 'landmark', '#2563eb', 50000.00, 2, ?),
+         ('Cash in Hand', 'Cash', 'banknote', '#16a34a', 5000.00, 1, ?)`,
+        [userId, userId],
+      );
+      const [newRows] = await pool.query(sql, params);
+      res.json(newRows);
+      return;
+    }
+
     res.json(rows);
   } catch (err) {
     next(err);
